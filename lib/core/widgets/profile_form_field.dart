@@ -9,12 +9,14 @@ class ProfileFormField extends StatelessWidget {
     this.initialValue,
     this.controller,
     this.keyboardType,
+    this.enabled = true,
   });
 
   final String label;
   final String? initialValue;
   final TextEditingController? controller;
   final TextInputType? keyboardType;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +26,7 @@ class ProfileFormField extends StatelessWidget {
         initialValue: controller == null ? initialValue : null,
         controller: controller,
         keyboardType: keyboardType,
+        enabled: enabled,
         decoration: InputDecoration(
           labelText: label,
           filled: true,

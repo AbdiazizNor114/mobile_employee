@@ -22,9 +22,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _lastNameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
-  late bool _careAssistant;
-  late bool _teamLead;
+  late final TextEditingController _jobTitleController;
   bool _extraOpen = false;
+  bool _isLoading = false;
+
+  bool get _isFormValid {
+    final first = _firstNameController.text.trim();
+    final last = _lastNameController.text.trim();
+    final email = _emailController.text.trim();
+    return first.isNotEmpty && last.isNotEmpty && email.contains('@');
+  }
 
   @override
   void initState() {
@@ -34,8 +41,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _lastNameController = TextEditingController(text: profile.lastName);
     _emailController = TextEditingController(text: profile.email);
     _phoneController = TextEditingController(text: profile.phoneNumber);
-    _careAssistant = profile.isCareAssistant;
-    _teamLead = profile.isTeamLead;
+    _jobTitleController = TextEditingController(text: profile.jobTitle);
   }
 
   @override
@@ -44,32 +50,62 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _jobTitleController.dispose();
     super.dispose();
   }
 
   void _closeEditor() {
-    context.go('/');
+    if (!_isLoading) context.go('/');
   }
 
-  void _saveProfile() {
-    ref.read(employeeProfileProvider.notifier).save(
-          EmployeeProfile(
-            firstName: _firstNameController.text.trim(),
-            lastName: _lastNameController.text.trim(),
-            email: _emailController.text.trim(),
-            phoneNumber: _phoneController.text.trim(),
-            isCareAssistant: _careAssistant,
-            isTeamLead: _teamLead,
+  Future<void> _saveProfile() async {
+    final existing = ref.read(employeeProfileProvider);
+    if (!_isFormValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add first name, last name, and a valid email.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ref.read(employeeProfileProvider.notifier).save(
+            EmployeeProfile(
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
+              email: _emailController.text.trim(),
+              phoneNumber: _phoneController.text.trim(),
+              isCareAssistant: existing.isCareAssistant,
+              isTeamLead: existing.isTeamLead,
+              jobTitle: _jobTitleController.text.trim(),
+              companyRole: existing.companyRole,
+            ),
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved.')),
+        );
+        context.go('/');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save profile. Please try again.'),
           ),
         );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile saved in demo mode.')),
-    );
-    context.go('/');
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final existing = ref.watch(employeeProfileProvider);
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 680.0 : double.infinity;
     final previewProfile = EmployeeProfile(
@@ -77,8 +113,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
       phoneNumber: _phoneController.text.trim(),
-      isCareAssistant: _careAssistant,
-      isTeamLead: _teamLead,
+      isCareAssistant: existing.isCareAssistant,
+      isTeamLead: existing.isTeamLead,
+      jobTitle: _jobTitleController.text.trim(),
+      companyRole: existing.companyRole,
     );
 
     return Scaffold(
@@ -88,7 +126,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             title: 'Edit Profile',
             leadingIcon: null,
             trailingIcon: Icons.close,
-            onTrailingPressed: _closeEditor,
+            onTrailingPressed: _isLoading ? null : _closeEditor,
           ),
           Expanded(
             child: Center(
@@ -110,7 +148,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             ),
                           ),
                           TextButton(
-                            onPressed: () {},
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Profile image upload will be added in a later slice.'),
+                                      ),
+                                    );
+                                  },
                             child: const Text('Change profile picture'),
                           ),
                         ],
@@ -120,49 +167,39 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ProfileFormField(
                       label: 'First name',
                       controller: _firstNameController,
+                      enabled: !_isLoading,
                     ),
                     ProfileFormField(
                       label: 'Last name',
                       controller: _lastNameController,
+                      enabled: !_isLoading,
                     ),
                     ProfileFormField(
                       label: 'Email',
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      enabled: !_isLoading,
                     ),
                     ProfileFormField(
                       label: 'Phone number',
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      enabled: !_isLoading,
                     ),
-                    ShaqoNetCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Job role', style: AppTypography.headingMedium),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: _careAssistant,
-                            onChanged: (value) =>
-                                setState(() => _careAssistant = value ?? false),
-                            title: const Text('Care assistant'),
-                          ),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: _teamLead,
-                            onChanged: (value) =>
-                                setState(() => _teamLead = value ?? false),
-                            title: const Text('Team lead'),
-                          ),
-                        ],
-                      ),
+                    ProfileFormField(
+                      label: 'Job title',
+                      controller: _jobTitleController,
+                      enabled: !_isLoading,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ShaqoNetCard(
                       child: ExpansionTile(
                         initiallyExpanded: _extraOpen,
-                        onExpansionChanged: (value) =>
-                            setState(() => _extraOpen = value),
+                        onExpansionChanged: (value) {
+                          if (!_isLoading) {
+                            setState(() => _extraOpen = value);
+                          }
+                        },
                         tilePadding: EdgeInsets.zero,
                         childrenPadding: EdgeInsets.zero,
                         title: Text('Extra information',
@@ -200,15 +237,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _closeEditor,
+                      onPressed: _isLoading ? null : _closeEditor,
                       child: const Text('Cancel'),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _saveProfile,
-                      child: const Text('Save profile'),
+                      onPressed: (_isFormValid && !_isLoading) ? _saveProfile : null,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Save profile'),
                     ),
                   ),
                 ],

@@ -126,6 +126,7 @@ class WorkerSyncService {
         'last_name': profile.lastName,
         'email': profile.email,
         'phone': profile.phoneNumber,
+        'job_title': profile.jobTitle,
       },
     );
   }
@@ -162,6 +163,10 @@ class WorkerSyncService {
   }
 
   Shift? _mapShift(Map raw) {
+    if (raw['deleted_at'] != null) {
+      return null;
+    }
+
     final date = (raw['shift_date'] as String?) ?? '';
     final startTime = (raw['start_time'] as String?) ?? '00:00:00';
     final endTime = (raw['end_time'] as String?) ?? '00:00:00';
@@ -172,6 +177,9 @@ class WorkerSyncService {
     }
 
     final status = (raw['status'] as String?) ?? '';
+    if (status != 'open' && status != 'assigned' && status != 'published') {
+      return null;
+    }
     final breakMinutesRaw = raw['break_minutes'];
     final breakMinutes = breakMinutesRaw is int
         ? breakMinutesRaw
