@@ -5,6 +5,7 @@ class Shift {
     required this.location,
     required this.startsAt,
     required this.endsAt,
+    this.breakMinutes = 0,
     required this.status,
   });
 
@@ -13,6 +14,7 @@ class Shift {
   final String location;
   final DateTime startsAt;
   final DateTime endsAt;
+  final int breakMinutes;
   final ShiftStatus status;
 
   Shift copyWith({
@@ -21,6 +23,7 @@ class Shift {
     String? location,
     DateTime? startsAt,
     DateTime? endsAt,
+    int? breakMinutes,
     ShiftStatus? status,
   }) {
     return Shift(
@@ -29,6 +32,7 @@ class Shift {
       location: location ?? this.location,
       startsAt: startsAt ?? this.startsAt,
       endsAt: endsAt ?? this.endsAt,
+      breakMinutes: breakMinutes ?? this.breakMinutes,
       status: status ?? this.status,
     );
   }
@@ -40,6 +44,7 @@ class Shift {
       'location': location,
       'startsAt': startsAt.toIso8601String(),
       'endsAt': endsAt.toIso8601String(),
+      'breakMinutes': breakMinutes,
       'status': status.name,
     };
   }
@@ -53,6 +58,7 @@ class Shift {
           DateTime.now(),
       endsAt:
           DateTime.tryParse(json['endsAt'] as String? ?? '') ?? DateTime.now(),
+      breakMinutes: json['breakMinutes'] as int? ?? 0,
       status: ShiftStatus.values.firstWhere(
         (status) => status.name == json['status'],
         orElse: () => ShiftStatus.confirmed,
