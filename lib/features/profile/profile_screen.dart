@@ -97,7 +97,19 @@ class _DashboardPassTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nextShift = ref.watch(nextShiftProvider);
+    final now = DateTime.now();
     final shifts = ref.watch(shiftsProvider);
+    final availableShifts = shifts
+        .where((shift) =>
+            shift.status == ShiftStatus.available &&
+            !shift.endsAt.isBefore(now))
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    final upcomingShifts = shifts
+        .where((shift) =>
+            shift.status != ShiftStatus.available)
+        .toList()
+      ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
     final profile = ref.watch(employeeProfileProvider);
 
     return Column(
@@ -105,21 +117,27 @@ class _DashboardPassTab extends StatelessWidget {
       children: [
         Text('Next shift', style: AppTypography.headingMedium),
         const SizedBox(height: AppSpacing.sm),
-        _NextShiftCard(shift: nextShift, profile: profile),
+        if (nextShift == null)
+          DashboardCard(
+            child: Text(
+              'No upcoming shifts yet',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.mutedText,
+              ),
+            ),
+          )
+        else
+          _NextShiftCard(shift: nextShift, profile: profile),
         const SizedBox(height: AppSpacing.lg),
         _ShiftListCard(
           title: 'Available shifts',
-          shifts: shifts
-              .where((shift) => shift.status == ShiftStatus.available)
-              .toList(),
+          shifts: availableShifts,
           accentColor: AppColors.primaryGreen,
         ),
         const SizedBox(height: AppSpacing.md),
         _ShiftListCard(
           title: 'Upcoming shifts',
-          shifts: shifts
-              .where((shift) => shift.status != ShiftStatus.available)
-              .toList(),
+          shifts: upcomingShifts,
           accentColor: AppColors.orangeHours,
         ),
       ],
@@ -169,7 +187,10 @@ class _NextShiftCard extends StatelessWidget {
                   text: '${_formatTime(shift.startsAt)} - '
                       '${_formatTime(shift.endsAt)}',
                 ),
-                _DetailRow(icon: Icons.coffee_outlined, text: 'Break 30 min'),
+                _DetailRow(
+                  icon: Icons.coffee_outlined,
+                  text: 'Break ${shift.breakMinutes} min',
+                ),
                 _DetailRow(
                   icon: Icons.confirmation_number_outlined,
                   text: 'Shift ID ${shift.id.toUpperCase()}',

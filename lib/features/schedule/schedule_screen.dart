@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/models/shift.dart';
+import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
@@ -45,6 +46,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                child: RefreshIndicator(
+                onRefresh: () => ref.refresh(backendSyncProvider.future),
                 child: ListView(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   children: [
@@ -89,19 +92,33 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                             ],
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          for (final shift in visibleShifts) ...[
-                            _ScheduleShiftTile(
-                              shift: shift,
-                              onTap: () => _showShiftDetails(context, shift),
-                            ),
-                            if (shift != visibleShifts.last)
-                              const Divider(height: AppSpacing.lg),
-                          ],
+                          if (visibleShifts.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: AppSpacing.lg,
+                              ),
+                              child: Text(
+                                'No shifts match this filter right now.',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.mutedText,
+                                ),
+                              ),
+                            )
+                          else
+                            for (final shift in visibleShifts) ...[
+                              _ScheduleShiftTile(
+                                shift: shift,
+                                onTap: () => _showShiftDetails(context, shift),
+                              ),
+                              if (shift != visibleShifts.last)
+                                const Divider(height: AppSpacing.lg),
+                            ],
                         ],
                       ),
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),
@@ -229,7 +246,7 @@ class _ScheduleSummary extends StatelessWidget {
       return shift.status != ShiftStatus.available;
     }).fold<double>(
       0,
-      (total, shift) => total + shift.endsAt.difference(shift.startsAt).inHours,
+      (total, shift) => total + _shiftDurationHours(shift),
     );
 
     return Row(
@@ -390,16 +407,23 @@ class _ScheduleShiftTile extends StatelessWidget {
   }
 }
 
-class _ShiftDetailSheet extends StatelessWidget {
+class _ShiftDetailSheet extends StatefulWidget {
   const _ShiftDetailSheet({required this.shift, required this.onAccept});
 
   final Shift shift;
-  final VoidCallback onAccept;
+  final Future<void> Function() onAccept;
+
+  @override
+  State<_ShiftDetailSheet> createState() => _ShiftDetailSheetState();
+}
+
+class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    final duration = shift.endsAt.difference(shift.startsAt).inHours;
-    final statusColor = _statusColor(shift.status);
+    final duration = _shiftDurationHours(widget.shift);
+    final statusColor = _statusColor(widget.shift.status);
 
     return SafeArea(
       top: false,
@@ -432,11 +456,11 @@ class _ShiftDetailSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        shift.role,
+                        widget.shift.role,
                         style: AppTypography.headingMedium,
                       ),
                       Text(
-                        shift.location,
+                        widget.shift.location,
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.mutedText,
                         ),
@@ -455,10 +479,10 @@ class _ShiftDetailSheet extends StatelessWidget {
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: [
-                _StatusChip(status: shift.status),
+                _StatusChip(status: widget.shift.status),
                 _InfoChip(
                   icon: Icons.confirmation_number_outlined,
-                  label: shift.id.toUpperCase(),
+                  label: widget.shift.id.toUpperCase(),
                 ),
               ],
             ),
@@ -467,22 +491,24 @@ class _ShiftDetailSheet extends StatelessWidget {
               icon: Icons.calendar_today_outlined,
               label: 'Date',
               value:
-                  '${_weekdayLong(shift.startsAt)}, ${shift.startsAt.day} ${_monthShort(shift.startsAt)}',
+                  '${_weekdayLong(widget.shift.startsAt)}, ${widget.shift.startsAt.day} ${_monthShort(widget.shift.startsAt)}',
             ),
             _DetailRow(
               icon: Icons.access_time_rounded,
               label: 'Time',
-              value: '${_time(shift.startsAt)} - ${_time(shift.endsAt)}',
+              value:
+                  '${_time(widget.shift.startsAt)} - ${_time(widget.shift.endsAt)}',
             ),
             _DetailRow(
               icon: Icons.hourglass_bottom_rounded,
               label: 'Duration',
-              value: '$duration hours, 30 min break',
+              value:
+                  '${duration.toStringAsFixed(duration == duration.roundToDouble() ? 0 : 1)} hours, ${widget.shift.breakMinutes} min break',
             ),
             _DetailRow(
               icon: Icons.notes_rounded,
               label: 'Notes',
-              value: shift.status == ShiftStatus.available
+              value: widget.shift.status == ShiftStatus.available
                   ? 'Open shift. Accepting it will notify the coordinator.'
                   : 'Bring your ID badge and check in when you arrive.',
             ),
@@ -490,23 +516,49 @@ class _ShiftDetailSheet extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: shift.status == ShiftStatus.available
-                    ? () {
-                        onAccept();
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Open shift accepted and added to your schedule.'),
-                          ),
-                        );
+                onPressed: (widget.shift.status == ShiftStatus.available &&
+                        !_isLoading)
+                    ? () async {
+                        setState(() => _isLoading = true);
+                        try {
+                          await widget.onAccept();
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Open shift accepted and added to your schedule.'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          setState(() => _isLoading = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Could not accept shift. Please try again later.'),
+                            ),
+                          );
+                        }
                       }
                     : null,
-                icon: const Icon(Icons.check_circle_outline_rounded),
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_circle_outline_rounded),
                 label: Text(
-                  shift.status == ShiftStatus.available
-                      ? 'Accept open shift'
-                      : 'Already assigned',
+                  _isLoading
+                      ? 'Accepting...'
+                      : (widget.shift.status == ShiftStatus.available
+                          ? 'Accept open shift'
+                          : 'Already assigned'),
                 ),
               ),
             ),
@@ -677,6 +729,14 @@ String _time(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+double _shiftDurationHours(Shift shift) {
+  var end = shift.endsAt;
+  if (end.isBefore(shift.startsAt)) {
+    end = end.add(const Duration(days: 1));
+  }
+  return end.difference(shift.startsAt).inMinutes / 60;
 }
 
 String _statusLabel(ShiftStatus status) {
