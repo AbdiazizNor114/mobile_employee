@@ -6,6 +6,9 @@ class EmployeeProfile {
     required this.phoneNumber,
     required this.isCareAssistant,
     required this.isTeamLead,
+    this.jobTitle = '',
+    this.companyRole = '',
+    this.profilePhotoUrl = '',
   });
 
   final String firstName;
@@ -14,6 +17,9 @@ class EmployeeProfile {
   final String phoneNumber;
   final bool isCareAssistant;
   final bool isTeamLead;
+  final String jobTitle;
+  final String companyRole;
+  final String profilePhotoUrl;
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -25,9 +31,21 @@ class EmployeeProfile {
   }
 
   String get primaryRole {
+    if (jobTitle.trim().isNotEmpty) return jobTitle.trim();
     if (isCareAssistant) return 'Care assistant';
     if (isTeamLead) return 'Team lead';
     return 'Employee';
+  }
+
+  String get companyRoleLabel {
+    final value = companyRole.trim();
+    if (value.isEmpty) return 'Employee';
+    return value
+        .split('_')
+        .map((part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
   }
 
   EmployeeProfile copyWith({
@@ -37,6 +55,9 @@ class EmployeeProfile {
     String? phoneNumber,
     bool? isCareAssistant,
     bool? isTeamLead,
+    String? jobTitle,
+    String? companyRole,
+    String? profilePhotoUrl,
   }) {
     return EmployeeProfile(
       firstName: firstName ?? this.firstName,
@@ -45,6 +66,9 @@ class EmployeeProfile {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       isCareAssistant: isCareAssistant ?? this.isCareAssistant,
       isTeamLead: isTeamLead ?? this.isTeamLead,
+      jobTitle: jobTitle ?? this.jobTitle,
+      companyRole: companyRole ?? this.companyRole,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 
@@ -56,6 +80,9 @@ class EmployeeProfile {
       'phoneNumber': phoneNumber,
       'isCareAssistant': isCareAssistant,
       'isTeamLead': isTeamLead,
+      'jobTitle': jobTitle,
+      'companyRole': companyRole,
+      'profilePhotoUrl': profilePhotoUrl,
     };
   }
 
@@ -67,6 +94,9 @@ class EmployeeProfile {
       phoneNumber: json['phoneNumber'] as String? ?? '',
       isCareAssistant: json['isCareAssistant'] as bool? ?? false,
       isTeamLead: json['isTeamLead'] as bool? ?? false,
+      jobTitle: json['jobTitle'] as String? ?? '',
+      companyRole: json['companyRole'] as String? ?? '',
+      profilePhotoUrl: json['profilePhotoUrl'] as String? ?? '',
     );
   }
 }

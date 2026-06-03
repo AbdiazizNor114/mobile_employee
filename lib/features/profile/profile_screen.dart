@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/models/absence_request.dart';
 import '../../core/models/employee_profile.dart';
 import '../../core/models/shift.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
+import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
@@ -72,19 +75,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _tabBody() {
     return switch (_selectedTab) {
       0 => _DashboardPassTab(ref: ref),
-      1 => const _SimpleInfoTab(
-          title: 'No absence requests',
-          message:
-              'Approved absence, sick leave, and vacation days will appear here.',
-          icon: Icons.beach_access_outlined,
-        ),
+      1 => const _AbsenceTab(),
       2 => const HoursScreen(showHeader: false),
-      _ => const _SimpleInfoTab(
-          title: 'Employment information',
-          message:
-              'Language, certificate, contract, and workplace details are ready for the next backend slice.',
-          icon: Icons.badge_outlined,
-        ),
+      _ => _InformationTab(profile: ref.watch(employeeProfileProvider)),
     };
   }
 }
@@ -107,9 +100,10 @@ class _DashboardPassTab extends StatelessWidget {
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final upcomingShifts = shifts
         .where((shift) =>
-            shift.status != ShiftStatus.available)
+            shift.status != ShiftStatus.available &&
+            !shift.endsAt.isBefore(now))
         .toList()
-      ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final profile = ref.watch(employeeProfileProvider);
 
     return Column(
@@ -160,10 +154,13 @@ class _NextShiftCard extends StatelessWidget {
           CircleAvatar(
             radius: 34,
             backgroundColor: AppColors.greenSoft,
-            child: Text(
-              profile.initials,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
+            backgroundImage: profilePhotoProvider(profile.profilePhotoUrl),
+            child: profilePhotoProvider(profile.profilePhotoUrl) != null
+                ? null
+                : Text(
+                    profile.initials,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -265,6 +262,435 @@ class _ShiftListCard extends StatelessWidget {
   }
 }
 
+class _AbsenceTab extends ConsumerStatefulWidget {
+  const _AbsenceTab();
+
+  @override
+  ConsumerState<_AbsenceTab> createState() => _AbsenceTabState();
+}
+
+class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
+  AbsenceType _type = AbsenceType.vacation;
+  DateTime _startDate = DateTime.now();
+  DateTime _endDate = DateTime.now();
+  final _noteController = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final requests = ref.watch(absenceRequestsProvider);
+    final pending = requests
+        .where((request) => request.status == AbsenceStatus.pending)
+        .length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DashboardCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.greenSoft,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.beach_access_outlined,
+                      color: AppColors.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Request absence',
+                            style: AppTypography.headingMedium),
+                        Text(
+                          pending == 0
+                              ? 'Send vacation, sick leave, or other time off.'
+                              : '$pending request${pending == 1 ? '' : 's'} waiting for review.',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              DropdownButtonFormField<AbsenceType>(
+                initialValue: _type,
+                decoration: const InputDecoration(
+                  labelText: 'Reason',
+                  prefixIcon: Icon(Icons.category_outlined),
+                ),
+                items: [
+                  for (final type in AbsenceType.values)
+                    DropdownMenuItem(
+                      value: type,
+                      child: Text(_absenceTypeLabel(type)),
+                    ),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() {
+                          if (value != null) _type = value;
+                        }),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DatePickButton(
+                      label: 'Start',
+                      date: _startDate,
+                      onPressed: _submitting
+                          ? null
+                          : () => _pickDate(isStartDate: true),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _DatePickButton(
+                      label: 'End',
+                      date: _endDate,
+                      onPressed: _submitting
+                          ? null
+                          : () => _pickDate(isStartDate: false),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _noteController,
+                enabled: !_submitting,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Note',
+                  hintText: 'Optional message for your manager',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _submitting ? null : _submit,
+                  icon: _submitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded),
+                  label: Text(_submitting ? 'Sending...' : 'Send request'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Text('Requests', style: AppTypography.headingMedium),
+        const SizedBox(height: AppSpacing.sm),
+        if (requests.isEmpty)
+          DashboardCard(
+            child: Text(
+              'No absence requests yet.',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.mutedText,
+              ),
+            ),
+          )
+        else
+          for (final request in requests) ...[
+            _AbsenceRequestCard(request: request),
+            if (request != requests.last) const SizedBox(height: AppSpacing.sm),
+          ],
+      ],
+    );
+  }
+
+  Future<void> _pickDate({required bool isStartDate}) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isStartDate ? _startDate : _endDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked == null) return;
+
+    setState(() {
+      if (isStartDate) {
+        _startDate = picked;
+        if (_endDate.isBefore(_startDate)) _endDate = _startDate;
+      } else {
+        _endDate = picked.isBefore(_startDate) ? _startDate : picked;
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    if (_endDate.isBefore(_startDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('End date must be after start date.')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await ref.read(absenceRequestsProvider.notifier).submit(
+            type: _type,
+            startDate: _startDate,
+            endDate: _endDate,
+            note: _noteController.text,
+          );
+      _noteController.clear();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Absence request sent.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_requestErrorMessage(error)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+}
+
+class _DatePickButton extends StatelessWidget {
+  const _DatePickButton({
+    required this.label,
+    required this.date,
+    required this.onPressed,
+  });
+
+  final String label;
+  final DateTime date;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.all(AppSpacing.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.mutedText,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(_formatShortDate(date), style: AppTypography.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _AbsenceRequestCard extends StatelessWidget {
+  const _AbsenceRequestCard({required this.request});
+
+  final AbsenceRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _absenceStatusColor(request.status);
+    return DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _absenceTypeLabel(request.type),
+                  style: AppTypography.headingMedium,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  _absenceStatusLabel(request.status),
+                  style: AppTypography.caption.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _DetailRow(
+            icon: Icons.date_range_outlined,
+            text:
+                '${_formatShortDate(request.startDate)} - ${_formatShortDate(request.endDate)}',
+          ),
+          if (request.note.trim().isNotEmpty)
+            _DetailRow(icon: Icons.notes_outlined, text: request.note.trim()),
+          if (request.managerNote.trim().isNotEmpty)
+            _DetailRow(
+              icon: Icons.supervisor_account_outlined,
+              text: request.managerNote.trim(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InformationTab extends StatelessWidget {
+  const _InformationTab({required this.profile});
+
+  final EmployeeProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.greenSoft,
+                backgroundImage: profilePhotoProvider(profile.profilePhotoUrl),
+                child: profilePhotoProvider(profile.profilePhotoUrl) != null
+                    ? null
+                    : Text(
+                        profile.initials,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.fullName.isEmpty
+                          ? 'Employee profile'
+                          : profile.fullName,
+                      style: AppTypography.headingMedium,
+                    ),
+                    Text(
+                      profile.primaryRole,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _InfoRow(
+            icon: Icons.mail_outline_rounded,
+            label: 'Email',
+            value: _fallback(profile.email),
+          ),
+          _InfoRow(
+            icon: Icons.phone_outlined,
+            label: 'Phone',
+            value: _fallback(profile.phoneNumber),
+          ),
+          _InfoRow(
+            icon: Icons.badge_outlined,
+            label: 'Company role',
+            value: profile.companyRoleLabel,
+          ),
+          _InfoRow(
+            icon: Icons.work_outline_rounded,
+            label: 'Job title',
+            value: _fallback(profile.jobTitle),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: AppColors.primaryGreen),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.mutedText,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(value, style: AppTypography.bodyMedium),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _formatShiftDate(DateTime date) {
   return '${_weekdayLong(date)}, ${date.day} ${_monthShort(date)}';
 }
@@ -273,6 +699,62 @@ String _formatTime(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+String _formatShortDate(DateTime date) {
+  return '${date.day} ${_monthShort(date)} ${date.year}';
+}
+
+String _fallback(String value) {
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? 'Not added' : trimmed;
+}
+
+String _absenceTypeLabel(AbsenceType type) {
+  return switch (type) {
+    AbsenceType.vacation => 'Vacation',
+    AbsenceType.sick => 'Sick leave',
+    AbsenceType.parental => 'Parental leave',
+    AbsenceType.other => 'Other',
+  };
+}
+
+String _absenceStatusLabel(AbsenceStatus status) {
+  return switch (status) {
+    AbsenceStatus.pending => 'Pending',
+    AbsenceStatus.approved => 'Approved',
+    AbsenceStatus.denied => 'Denied',
+  };
+}
+
+Color _absenceStatusColor(AbsenceStatus status) {
+  return switch (status) {
+    AbsenceStatus.pending => AppColors.orangeHours,
+    AbsenceStatus.approved => AppColors.primaryGreen,
+    AbsenceStatus.denied => AppColors.alertRed,
+  };
+}
+
+String _requestErrorMessage(Object error) {
+  if (error is DioException) {
+    final statusCode = error.response?.statusCode;
+    final data = error.response?.data;
+    final serverMessage = data is Map ? data['error'] ?? data['message'] : null;
+    if (serverMessage is String && serverMessage.trim().isNotEmpty) {
+      return serverMessage;
+    }
+    if (statusCode == 404) {
+      return 'Absence requests are not available on this API yet. Restart with the local API.';
+    }
+    if (statusCode == 401 || statusCode == 403) {
+      return 'Your session cannot send this request. Sign in again and retry.';
+    }
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout) {
+      return 'Could not reach the API. Check the mobile app API URL.';
+    }
+  }
+  return 'Could not send request. Pull to refresh and try again.';
 }
 
 String _weekdayLong(DateTime date) {
@@ -304,37 +786,4 @@ String _monthShort(DateTime date) {
     'Dec',
   ];
   return labels[date.month - 1];
-}
-
-class _SimpleInfoTab extends StatelessWidget {
-  const _SimpleInfoTab({
-    required this.title,
-    required this.message,
-    required this.icon,
-  });
-
-  final String title;
-  final String message;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return DashboardCard(
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.primaryGreen, size: 42),
-          const SizedBox(height: AppSpacing.md),
-          Text(title, style: AppTypography.headingMedium),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.mutedText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

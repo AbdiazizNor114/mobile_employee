@@ -24,7 +24,7 @@ class OfflineCacheBanner extends ConsumerWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              'Offline-ready data • ${_lastUpdatedLabel(lastUpdated)}',
+              'Synced data • ${_lastUpdatedLabel(lastUpdated)}',
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.darkText,
                 fontWeight: FontWeight.w800,

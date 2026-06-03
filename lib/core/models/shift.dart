@@ -7,6 +7,7 @@ class Shift {
     required this.endsAt,
     this.breakMinutes = 0,
     required this.status,
+    this.notes = '',
   });
 
   final String id;
@@ -16,6 +17,7 @@ class Shift {
   final DateTime endsAt;
   final int breakMinutes;
   final ShiftStatus status;
+  final String notes;
 
   Shift copyWith({
     String? id,
@@ -25,6 +27,7 @@ class Shift {
     DateTime? endsAt,
     int? breakMinutes,
     ShiftStatus? status,
+    String? notes,
   }) {
     return Shift(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Shift {
       endsAt: endsAt ?? this.endsAt,
       breakMinutes: breakMinutes ?? this.breakMinutes,
       status: status ?? this.status,
+      notes: notes ?? this.notes,
     );
   }
 
@@ -46,6 +50,7 @@ class Shift {
       'endsAt': endsAt.toIso8601String(),
       'breakMinutes': breakMinutes,
       'status': status.name,
+      'notes': notes,
     };
   }
 
@@ -63,6 +68,7 @@ class Shift {
         (status) => status.name == json['status'],
         orElse: () => ShiftStatus.confirmed,
       ),
+      notes: json['notes'] as String? ?? '',
     );
   }
 }

@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../services/worker_sync_service.dart';
+
+import 'mock_work_provider.dart';
+import 'message_provider.dart';
 
 final appConfigProvider = Provider<AppConfig>((ref) {
   return AppConfig.fromEnvironment();
@@ -28,13 +31,23 @@ final apiServiceProvider = Provider<ApiService>((ref) {
 });
 
 final authServiceProvider = Provider<AuthService>((ref) {
-  final config = ref.watch(appConfigProvider);
-  final client = config.hasSupabaseConfig ? Supabase.instance.client : null;
+  return AuthService(
+    apiService: ref.watch(apiServiceProvider),
+    storage: ref.watch(storageServiceProvider),
+  );
+});
 
-  return AuthService(client: client);
+final workerSyncServiceProvider = Provider<WorkerSyncService>((ref) {
+  return WorkerSyncService(
+    apiService: ref.watch(apiServiceProvider),
+    authService: ref.watch(authServiceProvider),
+  );
 });
 
 final demoSessionProvider = StateProvider<bool>((ref) => false);
+final companyNameProvider = Provider<String>((ref) {
+  return ref.watch(storageServiceProvider).readCompanyName();
+});
 
 final languageCodeProvider =
     StateNotifierProvider<LanguageCodeController, String>((ref) {
@@ -72,24 +85,38 @@ final currentSessionProvider = Provider<bool>((ref) {
   final demoSession = ref.watch(demoSessionProvider);
   if (demoSession) return true;
 
-  return ref.watch(authServiceProvider).hasActiveSession;
+  // By watching isSignedInProvider (a StreamProvider), we ensure this provider
+  // re-evaluates whenever the authentication state changes.
+  final authState = ref.watch(isSignedInProvider);
+  return authState.value ?? ref.watch(authServiceProvider).hasActiveSession;
 });
 
 final signOutProvider = Provider<Future<void> Function()>((ref) {
   return () async {
     ref.read(demoSessionProvider.notifier).state = false;
     await ref.read(authServiceProvider).signOut();
+    await ref.read(storageServiceProvider).clearWorkCache();
+
+    // Reset work providers to empty state
+    ref.read(resetWorkDataProvider)();
+  };
+});
+
+final resetWorkDataProvider = Provider<void Function()>((ref) {
+  return () {
+    ref.read(employeeProfileProvider.notifier).reset();
+    ref.read(shiftsProvider.notifier).reset();
+    ref.read(activityProvider.notifier).reset();
+    ref.read(messagesProvider.notifier).reset();
+    ref.read(absenceRequestsProvider.notifier).reset();
+    ref.read(cacheLastUpdatedProvider.notifier).state = null;
   };
 });
 
 final appBootstrapProvider = FutureProvider<void>((ref) async {
-  final config = ref.read(appConfigProvider);
   await ref.read(storageServiceProvider).initialize();
-
-  if (config.hasSupabaseConfig) {
-    await Supabase.initialize(
-      url: config.supabaseUrl,
-      anonKey: config.supabaseAnonKey,
-    );
-  }
+  ref
+      .read(apiServiceProvider)
+      .setUnauthorizedCallback(() => ref.read(signOutProvider)());
+  ref.read(authServiceProvider);
 });

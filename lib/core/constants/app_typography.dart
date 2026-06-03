@@ -13,6 +13,12 @@ class AppTypography {
     height: 1.2,
   );
 
+  static const headingSmall = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
+    height: 1.2,
+  );
+
   static const bodyLarge = TextStyle(fontSize: 16, height: 1.45);
   static const bodyMedium = TextStyle(fontSize: 14, height: 1.45);
   static const caption = TextStyle(fontSize: 12, height: 1.35);

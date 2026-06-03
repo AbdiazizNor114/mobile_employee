@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/models/employee_profile.dart';
 import '../../core/providers/mock_work_provider.dart';
+import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/profile_form_field.dart';
 import '../../core/widgets/shaqonet_card.dart';
@@ -18,13 +22,17 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  static const _maxPhotoBytes = 700 * 1024;
+
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
   late final TextEditingController _jobTitleController;
+  late final TextEditingController _profilePhotoUrlController;
   bool _extraOpen = false;
   bool _isLoading = false;
+  final _picker = ImagePicker();
 
   bool get _isFormValid {
     final first = _firstNameController.text.trim();
@@ -42,6 +50,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _emailController = TextEditingController(text: profile.email);
     _phoneController = TextEditingController(text: profile.phoneNumber);
     _jobTitleController = TextEditingController(text: profile.jobTitle);
+    _profilePhotoUrlController =
+        TextEditingController(text: profile.profilePhotoUrl);
   }
 
   @override
@@ -51,6 +61,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _jobTitleController.dispose();
+    _profilePhotoUrlController.dispose();
     super.dispose();
   }
 
@@ -82,6 +93,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               isTeamLead: existing.isTeamLead,
               jobTitle: _jobTitleController.text.trim(),
               companyRole: existing.companyRole,
+              profilePhotoUrl: _profilePhotoUrlController.text.trim(),
             ),
           );
 
@@ -103,6 +115,45 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickPhotoFromGallery() async {
+    if (_isLoading) return;
+
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        imageQuality: 80,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > _maxPhotoBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image is too large. Choose a smaller photo.'),
+            ),
+          );
+        }
+        return;
+      }
+      final extension = picked.name.toLowerCase();
+      final mimeType = extension.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      final value = 'data:$mimeType;base64,${base64Encode(bytes)}';
+      _profilePhotoUrlController.text = value;
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not pick image. Please try again.'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final existing = ref.watch(employeeProfileProvider);
@@ -117,6 +168,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       isTeamLead: existing.isTeamLead,
       jobTitle: _jobTitleController.text.trim(),
       companyRole: existing.companyRole,
+      profilePhotoUrl: _profilePhotoUrlController.text.trim(),
     );
 
     return Scaffold(
@@ -141,24 +193,39 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           CircleAvatar(
                             radius: 44,
                             backgroundColor: AppColors.greenSoft,
-                            child: Text(
-                              previewProfile.initials,
-                              style: const TextStyle(
-                                  fontSize: 24, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _isLoading
+                            backgroundImage:
+                                profilePhotoProvider(previewProfile.profilePhotoUrl),
+                            child: profilePhotoProvider(
+                                        previewProfile.profilePhotoUrl) !=
+                                    null
                                 ? null
-                                : () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            'Profile image upload will be added in a later slice.'),
-                                      ),
-                                    );
-                                  },
-                            child: const Text('Change profile picture'),
+                                : Text(
+                                    previewProfile.initials,
+                                    style: const TextStyle(
+                                        fontSize: 24, fontWeight: FontWeight.w900),
+                                  ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              TextButton.icon(
+                                onPressed:
+                                    _isLoading ? null : _pickPhotoFromGallery,
+                                icon: const Icon(Icons.photo_library_outlined),
+                                label: const Text('Choose from gallery'),
+                              ),
+                              if (_profilePhotoUrlController.text.isNotEmpty)
+                                TextButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () {
+                                          _profilePhotoUrlController.clear();
+                                          setState(() {});
+                                        },
+                                  child: const Text('Remove'),
+                                ),
+                            ],
                           ),
                         ],
                       ),

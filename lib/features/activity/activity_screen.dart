@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/app_typography.dart';
 import '../../core/models/activity_item.dart';
 import '../../core/providers/mock_work_provider.dart';
+import '../../core/providers/backend_sync_provider.dart';
 import '../../core/widgets/activity_list_item.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
@@ -50,41 +52,54 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         children: [
           const AppHeader(title: 'Activities', leadingIcon: null),
           Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: contentMaxWidth),
-                child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    const OfflineCacheBanner(),
-                    const SizedBox(height: AppSpacing.md),
-                    DashboardCard(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '$unreadCount unread',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
+            child: RefreshIndicator(
+          onRefresh: () => ref.refresh(backendSyncProvider.future),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: contentMaxWidth),
+              child: ListView(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                children: [
+                  const OfflineCacheBanner(),
+                  const SizedBox(height: AppSpacing.md),
+                  DashboardCard(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '$unreadCount unread',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                          TextButton(
-                            onPressed: unreadCount == 0
-                                ? null
-                                : () => ref
-                                    .read(activityProvider.notifier)
-                                    .markAllRead(),
-                            child: const Text('Mark all read'),
-                          ),
-                        ],
-                      ),
+                        ),
+                        TextButton(
+                          onPressed: unreadCount == 0
+                              ? null
+                              : () => ref
+                                  .read(activityProvider.notifier)
+                                  .markAllRead(),
+                          child: const Text('Mark all read'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    DashboardCard(
-                      child: Column(
-                        children: [
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DashboardCard(
+                    child: Column(
+                      children: [
+                        if (activity.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xl),
+                            child: Text(
+                              'No activity yet.',
+                              style: AppTypography.bodyMedium.copyWith(
+                                color: AppColors.mutedText,
+                              ),
+                            ),
+                          )
+                        else
                           for (final item in activity)
                             ActivityListItem(
                               icon: _iconFor(item.type),
@@ -94,13 +109,14 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                               time: _timeFor(item.createdAt),
                               isUnread: item.isUnread,
                             ),
-                        ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
+        ),
           ),
         ],
       ),

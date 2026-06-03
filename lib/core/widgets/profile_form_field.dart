@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_spacing.dart';
 
+// Form field for profile editing with support for disabling while loading
 class ProfileFormField extends StatelessWidget {
   const ProfileFormField({
     super.key,

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/models/shift.dart';
+import '../../core/providers/mock_work_provider.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
@@ -32,7 +34,8 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final workedDays = _workedDays();
+    final shifts = ref.watch(shiftsProvider);
+    final workedDays = _workedDaysFromShifts(shifts);
     final visibleDays = workedDays.where((day) {
       return !day.date.isBefore(_selectedRange.start) &&
           !day.date.isAfter(_selectedRange.end);
@@ -42,7 +45,19 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
       (total, day) => total + day.hours,
     );
     final workDays = visibleDays.length;
-    final breakHours = workDays * 0.5;
+    final breakHours =
+        visibleDays.fold<double>(0, (sum, day) => sum + day.breakHours);
+    final completedHours = _completedShiftHoursInRange(
+      shifts: shifts,
+      start: _selectedRange.start,
+      end: _selectedRange.end,
+    );
+    final aiInsight = _buildAiInsight(
+      scheduledHours: totalHours,
+      completedHours: completedHours,
+      breakHours: breakHours,
+      workDays: workDays,
+    );
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 720.0 : double.infinity;
 
@@ -164,7 +179,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'AI insight: Your time record is stable for the selected range. Review changed shifts before the report closes.',
+                    aiInsight,
                     style: AppTypography.bodyMedium.copyWith(
                       color: AppColors.mutedText,
                     ),
@@ -272,19 +287,82 @@ DateTimeRange _normalizeRange(DateTime start, DateTime end) {
   );
 }
 
-List<_WorkedDay> _workedDays() {
-  final today = DateTime.now();
-  final base = DateTime(today.year, today.month, today.day);
+List<_WorkedDay> _workedDaysFromShifts(List<Shift> shifts) {
+  final grouped = <String, _WorkedDay>{};
+  for (final shift in shifts) {
+    if (shift.status == ShiftStatus.available) continue;
+    final date = DateTime(
+      shift.startsAt.year,
+      shift.startsAt.month,
+      shift.startsAt.day,
+    );
+    final key = '${date.year}-${date.month}-${date.day}';
+    final totalHours = _shiftDurationHours(shift);
+    final breakHours = shift.breakMinutes / 60;
+    final existing = grouped[key];
+    if (existing == null) {
+      grouped[key] = _WorkedDay(date, totalHours, breakHours);
+    } else {
+      grouped[key] = _WorkedDay(
+        date,
+        existing.hours + totalHours,
+        existing.breakHours + breakHours,
+      );
+    }
+  }
+  final days = grouped.values.toList()
+    ..sort((a, b) => b.date.compareTo(a.date));
+  return days;
+}
 
-  return [
-    _WorkedDay(base.subtract(const Duration(days: 15)), 8),
-    _WorkedDay(base.subtract(const Duration(days: 10)), 7.5),
-    _WorkedDay(base.subtract(const Duration(days: 6)), 8),
-    _WorkedDay(base.subtract(const Duration(days: 3)), 7.5),
-    _WorkedDay(base.subtract(const Duration(days: 2)), 6.5),
-    _WorkedDay(base.subtract(const Duration(days: 1)), 8),
-    _WorkedDay(base, 4),
-  ];
+double _completedShiftHoursInRange({
+  required List<Shift> shifts,
+  required DateTime start,
+  required DateTime end,
+}) {
+  final now = DateTime.now();
+  return shifts.where((shift) {
+    if (shift.status == ShiftStatus.available) return false;
+    if (_effectiveShiftEnd(shift).isAfter(now)) return false;
+    final shiftDate = DateTime(
+      shift.startsAt.year,
+      shift.startsAt.month,
+      shift.startsAt.day,
+    );
+    return !shiftDate.isBefore(start) && !shiftDate.isAfter(end);
+  }).fold<double>(0, (sum, shift) => sum + _shiftDurationHours(shift));
+}
+
+String _buildAiInsight({
+  required double scheduledHours,
+  required double completedHours,
+  required double breakHours,
+  required int workDays,
+}) {
+  if (workDays == 0) {
+    return 'AI insight: No assigned shifts in this range yet. Add a shift or widen the date range.';
+  }
+  if (completedHours == 0 && scheduledHours > 0) {
+    return 'AI insight: You have ${_formatHours(scheduledHours)} scheduled hours in this range, but none completed yet.';
+  }
+  if (scheduledHours == completedHours) {
+    return 'AI insight: Great consistency. All scheduled hours in this range are completed.';
+  }
+  final remaining =
+      (scheduledHours - completedHours).clamp(0, scheduledHours).toDouble();
+  return 'AI insight: ${_formatHours(completedHours)}h completed, ${_formatHours(remaining)}h remaining, with ${_formatHours(breakHours)}h break time scheduled.';
+}
+
+double _shiftDurationHours(Shift shift) {
+  return _effectiveShiftEnd(shift).difference(shift.startsAt).inMinutes / 60;
+}
+
+DateTime _effectiveShiftEnd(Shift shift) {
+  var end = shift.endsAt;
+  if (!end.isAfter(shift.startsAt)) {
+    end = end.add(const Duration(days: 1));
+  }
+  return end;
 }
 
 String _formatDate(DateTime date) {
@@ -324,8 +402,9 @@ String _monthShort(DateTime date) {
 }
 
 class _WorkedDay {
-  const _WorkedDay(this.date, this.hours);
+  const _WorkedDay(this.date, this.hours, this.breakHours);
 
   final DateTime date;
   final double hours;
+  final double breakHours;
 }

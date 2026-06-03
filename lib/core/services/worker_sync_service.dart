@@ -1,4 +1,5 @@
 import '../models/activity_item.dart';
+import '../models/absence_request.dart';
 import '../models/employee_profile.dart';
 import '../models/shift.dart';
 import '../models/message.dart';
@@ -11,12 +12,14 @@ class WorkerSyncPayload {
     required this.shifts,
     required this.activities,
     required this.messages,
+    required this.absenceRequests,
   });
 
   final EmployeeProfile profile;
   final List<Shift> shifts;
   final List<ActivityItem> activities;
   final List<AppMessage> messages;
+  final List<AbsenceRequest> absenceRequests;
 }
 
 class WorkerSyncService {
@@ -51,13 +54,10 @@ class WorkerSyncService {
       employeeData = (employeeResponse.data?['data'] as Map?) ?? const {};
     } catch (_) {}
 
-    List shiftsRaw = const [];
-    try {
-      final shiftsResponse = await _apiService.client.get<Map<String, dynamic>>(
-        '/api/v1/companies/$companyId/shifts',
-      );
-      shiftsRaw = (shiftsResponse.data?['data'] as List?) ?? const [];
-    } catch (_) {}
+    final shiftsResponse = await _apiService.client.get<Map<String, dynamic>>(
+      '/api/v1/companies/$companyId/shifts',
+    );
+    final shiftsRaw = (shiftsResponse.data?['data'] as List?) ?? const [];
 
     List activityRaw = const [];
     try {
@@ -70,21 +70,33 @@ class WorkerSyncService {
 
     List messagesRaw = const [];
     try {
-      final messagesResponse = await _apiService.client.get<Map<String, dynamic>>(
+      final messagesResponse =
+          await _apiService.client.get<Map<String, dynamic>>(
         '/api/v1/companies/$companyId/messages',
       );
       messagesRaw = (messagesResponse.data?['data'] as List?) ?? const [];
+    } catch (_) {}
+
+    List absenceRaw = const [];
+    try {
+      final absenceResponse =
+          await _apiService.client.get<Map<String, dynamic>>(
+        '/api/v1/companies/$companyId/absences',
+      );
+      absenceRaw = (absenceResponse.data?['data'] as List?) ?? const [];
     } catch (_) {}
 
     return WorkerSyncPayload(
       profile: _mapProfile(profileMap, memberships, employeeData, shiftsRaw),
       shifts: shiftsRaw
           .whereType<Map>()
-          .map(_mapShift)
+          .map((raw) => _mapShift(raw, membershipId))
           .whereType<Shift>()
           .toList(),
       activities: activityRaw.whereType<Map>().map(_mapActivity).toList(),
       messages: messagesRaw.whereType<Map>().map(_mapMessage).toList(),
+      absenceRequests:
+          absenceRaw.whereType<Map>().map(_mapAbsenceRequest).toList(),
     );
   }
 
@@ -127,8 +139,36 @@ class WorkerSyncService {
         'email': profile.email,
         'phone': profile.phoneNumber,
         'job_title': profile.jobTitle,
+        'profile_photo_url': profile.profilePhotoUrl,
       },
     );
+  }
+
+  Future<AbsenceRequest> submitAbsenceRequest({
+    required AbsenceType type,
+    required DateTime startDate,
+    required DateTime endDate,
+    String note = '',
+  }) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    final response = await _apiService.client.post<Map<String, dynamic>>(
+      '/api/v1/companies/$companyId/absences',
+      data: {
+        'type': type.name,
+        'startDate': _dateOnly(startDate),
+        'endDate': _dateOnly(endDate),
+        'notes': note,
+      },
+    );
+    final raw = (response.data?['data'] as Map?)?['absence'] as Map?;
+    if (raw == null) {
+      throw StateError('Missing absence response.');
+    }
+    return _mapAbsenceRequest(raw);
   }
 
   EmployeeProfile _mapProfile(
@@ -146,9 +186,14 @@ class WorkerSyncService {
             ? ((memberships.first as Map)['role'] as String?) ?? ''
             : '');
     final employeeJobTitle = (employee['job_title'] as String?) ?? '';
-    final shiftJobTitle = shiftsRaw.isNotEmpty && shiftsRaw.first is Map
-        ? ((shiftsRaw.first as Map)['job_role'] as String?) ?? ''
-        : '';
+    final companyMembership = memberships.whereType<Map>().firstWhere(
+          (m) => '${m['company_id']}' == _authService.companyId,
+          orElse: () => const {},
+        );
+    final membershipPhoto =
+        (companyMembership['profile_photo_url'] as String?) ?? '';
+    final membershipJobTitle =
+        (companyMembership['job_title'] as String?) ?? '';
     return EmployeeProfile(
       firstName: firstName,
       lastName: lastName,
@@ -156,13 +201,15 @@ class WorkerSyncService {
       phoneNumber: (employee['phone'] ?? profile['phone'] ?? '') as String,
       isCareAssistant: role == 'worker',
       isTeamLead: role == 'manager',
-      jobTitle:
-          employeeJobTitle.trim().isNotEmpty ? employeeJobTitle : shiftJobTitle,
+      jobTitle: employeeJobTitle.trim().isNotEmpty
+          ? employeeJobTitle
+          : membershipJobTitle,
       companyRole: role,
+      profilePhotoUrl: membershipPhoto,
     );
   }
 
-  Shift? _mapShift(Map raw) {
+  Shift? _mapShift(Map raw, String membershipId) {
     if (raw['deleted_at'] != null) {
       return null;
     }
@@ -171,13 +218,28 @@ class WorkerSyncService {
     final startTime = (raw['start_time'] as String?) ?? '00:00:00';
     final endTime = (raw['end_time'] as String?) ?? '00:00:00';
     final start = DateTime.tryParse('${date}T$startTime');
-    final end = DateTime.tryParse('${date}T$endTime');
-    if (start == null || end == null) {
+    final parsedEnd = DateTime.tryParse('${date}T$endTime');
+    if (start == null || parsedEnd == null) {
       return null;
     }
+    var end = parsedEnd;
+    if (!end.isAfter(start)) {
+      end = end.add(const Duration(days: 1));
+    }
 
+    final assignedMembershipId = (raw['assigned_member_id'] as String?) ?? '';
     final status = (raw['status'] as String?) ?? '';
-    if (status != 'open' && status != 'assigned' && status != 'published') {
+    final isAssignedStatus = status == 'assigned' ||
+        status == 'published' ||
+        status == 'confirmed' ||
+        status == 'accepted' ||
+        status == 'completed';
+    if (assignedMembershipId.isNotEmpty &&
+        isAssignedStatus &&
+        assignedMembershipId != membershipId) {
+      return null;
+    }
+    if (!isAssignedStatus && status != 'open') {
       return null;
     }
     final breakMinutesRaw = raw['break_minutes'];
@@ -196,9 +258,38 @@ class WorkerSyncService {
       breakMinutes: breakMinutes,
       status: switch (status) {
         'open' => ShiftStatus.available,
-        'assigned' || 'published' => ShiftStatus.confirmed,
+        'assigned' ||
+        'published' ||
+        'confirmed' ||
+        'accepted' ||
+        'completed' =>
+          ShiftStatus.confirmed,
         _ => ShiftStatus.changed,
       },
+      notes: (raw['notes'] as String?)?.trim() ?? '',
+    );
+  }
+
+  AbsenceRequest _mapAbsenceRequest(Map raw) {
+    return AbsenceRequest(
+      id: (raw['id'] as String?) ?? '',
+      type: AbsenceType.values.firstWhere(
+        (type) => type.name == raw['type'],
+        orElse: () => AbsenceType.vacation,
+      ),
+      startDate: DateTime.tryParse((raw['start_date'] as String?) ?? '') ??
+          DateTime.now(),
+      endDate: DateTime.tryParse((raw['end_date'] as String?) ?? '') ??
+          DateTime.now(),
+      status: AbsenceStatus.values.firstWhere(
+        (status) => status.name == raw['status'],
+        orElse: () => AbsenceStatus.pending,
+      ),
+      createdAt: DateTime.tryParse((raw['created_at'] as String?) ?? '') ??
+          DateTime.now(),
+      note: (raw['notes'] as String?) ?? '',
+      managerNote: (raw['manager_note'] as String?) ?? '',
+      reviewedAt: DateTime.tryParse((raw['reviewed_at'] as String?) ?? ''),
     );
   }
 
@@ -230,5 +321,11 @@ class WorkerSyncService {
             ? part
             : '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
+  }
+
+  String _dateOnly(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
   }
 }

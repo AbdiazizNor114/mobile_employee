@@ -6,6 +6,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
+import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
@@ -16,6 +17,7 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(employeeProfileProvider);
+    final companyName = ref.watch(companyNameProvider);
     final languageCode = ref.watch(languageCodeProvider);
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 720.0 : double.infinity;
@@ -30,7 +32,6 @@ class AccountScreen extends ConsumerWidget {
             trailingIcon: Icons.logout_rounded,
             onTrailingPressed: () async {
               await ref.read(signOutProvider)();
-              if (context.mounted) context.go('/login');
             },
           ),
           Expanded(
@@ -48,13 +49,18 @@ class AccountScreen extends ConsumerWidget {
                           CircleAvatar(
                             radius: 44,
                             backgroundColor: AppColors.greenSoft,
-                            child: Text(
-                              profile.initials,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
+                            backgroundImage:
+                                profilePhotoProvider(profile.profilePhotoUrl),
+                            child: profilePhotoProvider(profile.profilePhotoUrl) !=
+                                    null
+                                ? null
+                                : Text(
+                                    profile.initials,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           Text(profile.fullName,
@@ -79,15 +85,23 @@ class AccountScreen extends ConsumerWidget {
                           ),
                           const Divider(height: AppSpacing.lg),
                           _ProfileInfoRow(
-                            icon: Icons.phone_outlined,
-                            label: 'Phone',
-                            value: profile.phoneNumber,
+                            icon: Icons.badge_outlined,
+                            label: 'Role',
+                            value: profile.companyRoleLabel,
                           ),
                           const Divider(height: AppSpacing.lg),
-                          const _ProfileInfoRow(
+                          _ProfileInfoRow(
+                            icon: Icons.phone_outlined,
+                            label: 'Phone',
+                            value: profile.phoneNumber.isEmpty
+                                ? 'Not provided'
+                                : profile.phoneNumber,
+                          ),
+                          const Divider(height: AppSpacing.lg),
+                          _ProfileInfoRow(
                             icon: Icons.business_outlined,
                             label: 'Company',
-                            value: 'North Care Services',
+                            value: companyName,
                           ),
                         ],
                       ),

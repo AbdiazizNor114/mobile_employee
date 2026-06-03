@@ -47,9 +47,9 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
           label: labels.activity,
         ),
         NavigationDestination(
-          icon: Icon(Icons.query_stats_outlined),
-          selectedIcon: Icon(Icons.query_stats_rounded),
-          label: labels.hours,
+          icon: Icon(Icons.chat_bubble_outline_rounded),
+          selectedIcon: Icon(Icons.chat_bubble_rounded),
+          label: labels.messages,
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline_rounded),
@@ -66,14 +66,14 @@ class _NavLabels {
     required this.home,
     required this.schedule,
     required this.activity,
-    required this.hours,
+    required this.messages,
     required this.profile,
   });
 
   final String home;
   final String schedule;
   final String activity;
-  final String hours;
+  final String messages;
   final String profile;
 
   factory _NavLabels.forLanguage(String languageCode) {
@@ -82,7 +82,7 @@ class _NavLabels {
         home: 'Hoy',
         schedule: 'Jadwal',
         activity: 'Hawlaha',
-        hours: 'Saacado',
+        messages: 'Farriimaha',
         profile: 'Profile',
       );
     }
@@ -91,7 +91,7 @@ class _NavLabels {
       home: 'Home',
       schedule: 'Schedule',
       activity: 'Activity',
-      hours: 'Hours',
+      messages: 'Messages',
       profile: 'Profile',
     );
   }

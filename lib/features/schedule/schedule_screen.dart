@@ -47,78 +47,79 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: contentMaxWidth),
                 child: RefreshIndicator(
-                onRefresh: () => ref.refresh(backendSyncProvider.future),
-                child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    SegmentedTabs(
-                      tabs: const ['All', 'Confirmed', 'Open'],
-                      selectedIndex: _selectedTab,
-                      onChanged: (index) =>
-                          setState(() => _selectedTab = index),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    const OfflineCacheBanner(),
-                    const SizedBox(height: AppSpacing.md),
-                    DashboardCard(
-                      child: _WeekStrip(
-                        selectedDay: _selectedDay,
-                        onSelected: (index) =>
-                            setState(() => _selectedDay = index),
+                  onRefresh: () => ref.refresh(backendSyncProvider.future),
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    children: [
+                      SegmentedTabs(
+                        tabs: const ['All', 'Confirmed', 'Open'],
+                        selectedIndex: _selectedTab,
+                        onChanged: (index) =>
+                            setState(() => _selectedTab = index),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _ScheduleSummary(shifts: shifts),
-                    const SizedBox(height: AppSpacing.md),
-                    DashboardCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
+                      const SizedBox(height: AppSpacing.md),
+                      const OfflineCacheBanner(),
+                      const SizedBox(height: AppSpacing.md),
+                      DashboardCard(
+                        child: _WeekStrip(
+                          selectedDay: _selectedDay,
+                          onSelected: (index) =>
+                              setState(() => _selectedDay = index),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      _ScheduleSummary(shifts: shifts),
+                      const SizedBox(height: AppSpacing.md),
+                      DashboardCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Upcoming shifts',
+                                    style: AppTypography.headingMedium,
+                                  ),
+                                ),
+                                Text(
+                                  '${visibleShifts.length} shifts',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.mutedText,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            if (visibleShifts.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.lg,
+                                ),
                                 child: Text(
-                                  'Upcoming shifts',
-                                  style: AppTypography.headingMedium,
+                                  'No shifts match this filter right now.',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.mutedText,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '${visibleShifts.length} shifts',
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.mutedText,
-                                  fontWeight: FontWeight.w800,
+                              )
+                            else
+                              for (final shift in visibleShifts) ...[
+                                _ScheduleShiftTile(
+                                  shift: shift,
+                                  onTap: () =>
+                                      _showShiftDetails(context, shift),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          if (visibleShifts.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.lg,
-                              ),
-                              child: Text(
-                                'No shifts match this filter right now.',
-                                style: AppTypography.bodyMedium.copyWith(
-                                  color: AppColors.mutedText,
-                                ),
-                              ),
-                            )
-                          else
-                            for (final shift in visibleShifts) ...[
-                              _ScheduleShiftTile(
-                                shift: shift,
-                                onTap: () => _showShiftDetails(context, shift),
-                              ),
-                              if (shift != visibleShifts.last)
-                                const Divider(height: AppSpacing.lg),
-                            ],
-                        ],
+                                if (shift != visibleShifts.last)
+                                  const Divider(height: AppSpacing.lg),
+                              ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               ),
             ),
           ),
@@ -424,6 +425,7 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
   Widget build(BuildContext context) {
     final duration = _shiftDurationHours(widget.shift);
     final statusColor = _statusColor(widget.shift.status);
+    final managerNote = widget.shift.notes.trim();
 
     return SafeArea(
       top: false,
@@ -508,9 +510,11 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
             _DetailRow(
               icon: Icons.notes_rounded,
               label: 'Notes',
-              value: widget.shift.status == ShiftStatus.available
-                  ? 'Open shift. Accepting it will notify the coordinator.'
-                  : 'Bring your ID badge and check in when you arrive.',
+              value: managerNote.isNotEmpty
+                  ? managerNote
+                  : widget.shift.status == ShiftStatus.available
+                      ? 'Open shift. Accepting it will notify the coordinator.'
+                      : 'No manager note for this shift.',
             ),
             const SizedBox(height: AppSpacing.lg),
             SizedBox(

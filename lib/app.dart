@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -57,16 +58,21 @@ class _ShaqoNetEmployeeAppState extends ConsumerState<ShaqoNetEmployeeApp> {
   Widget build(BuildContext context) {
     ref.listen(isSignedInProvider, (previous, next) => _routerRefresh.value++);
     ref.listen(demoSessionProvider, (previous, next) => _routerRefresh.value++);
+    
+    final languageCode = ref.watch(languageCodeProvider);
+
     return MaterialApp.router(
       title: 'ShaqoNet',
       debugShowCheckedModeBanner: false,
       routerConfig: _router,
-      locale: const Locale('en'),
+      locale: Locale(languageCode),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
+        _SomaliMaterialLocalizationsDelegate(),
+        _SomaliCupertinoLocalizationsDelegate(),
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
@@ -93,4 +99,36 @@ class _ShaqoNetEmployeeAppState extends ConsumerState<ShaqoNetEmployeeApp> {
       ),
     );
   }
+}
+
+class _SomaliMaterialLocalizationsDelegate
+    extends LocalizationsDelegate<MaterialLocalizations> {
+  const _SomaliMaterialLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => locale.languageCode == 'so';
+
+  @override
+  Future<MaterialLocalizations> load(Locale locale) async {
+    return GlobalMaterialLocalizations.delegate.load(const Locale('en'));
+  }
+
+  @override
+  bool shouldReload(_SomaliMaterialLocalizationsDelegate old) => false;
+}
+
+class _SomaliCupertinoLocalizationsDelegate
+    extends LocalizationsDelegate<CupertinoLocalizations> {
+  const _SomaliCupertinoLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => locale.languageCode == 'so';
+
+  @override
+  Future<CupertinoLocalizations> load(Locale locale) async {
+    return GlobalCupertinoLocalizations.delegate.load(const Locale('en'));
+  }
+
+  @override
+  bool shouldReload(_SomaliCupertinoLocalizationsDelegate old) => false;
 }

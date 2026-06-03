@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
@@ -28,11 +29,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _signIn() async {
-    final config = ref.read(appConfigProvider);
-    if (!config.hasSupabaseConfig) {
-      setState(() {
-        _message = 'Real sign-in is not configured yet. Use Demo mode for now.';
-      });
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _message = 'Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setState(() => _message = 'Password must be at least 6 characters.');
       return;
     }
 
@@ -42,16 +48,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
+      // Clear any stale data before logging in as a new user
+      ref.read(resetWorkDataProvider)();
+
       await ref.read(authServiceProvider).signInWithEmail(
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
 
+      ref.read(demoSessionProvider.notifier).state = false;
       if (mounted) context.go('/');
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      String message = 'Could not sign in. Check your email and password.';
+      if (error is DioException) {
+        final status = error.response?.statusCode;
+        final data = error.response?.data;
+        if (status != null) {
+          message = 'Sign-in failed ($status). Please try again.';
+        }
+        if (data is Map && data['error'] is String) {
+          message = data['error'] as String;
+        }
+      }
       setState(() {
-        _message = 'Could not sign in. Check your email and password.';
+        _message = message;
       });
     } finally {
       if (mounted) {
@@ -63,7 +84,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final hasSupabaseConfig = ref.watch(appConfigProvider).hasSupabaseConfig;
 
     return Scaffold(
       body: SafeArea(
@@ -105,15 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: _isLoading ? null : _signIn,
                 child: Text(_isLoading ? 'Signing in...' : l10n.signIn),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              OutlinedButton(
-                onPressed: () {
-                  ref.read(demoSessionProvider.notifier).state = true;
-                  context.go('/');
-                },
-                child: Text(l10n.demoMode),
-              ),
-              if (!hasSupabaseConfig || _message != null) ...[
+              if (_message != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -122,8 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Text(
-                    _message ??
-                        'Real sign-in needs Supabase URL and anon key. Demo mode is available.',
+                    _message!,
                     textAlign: TextAlign.center,
                     style: AppTypography.bodyMedium.copyWith(
                       color: AppColors.mutedText,
