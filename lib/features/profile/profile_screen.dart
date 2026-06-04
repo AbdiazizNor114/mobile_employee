@@ -8,6 +8,7 @@ import '../../core/constants/app_typography.dart';
 import '../../core/models/absence_request.dart';
 import '../../core/models/employee_profile.dart';
 import '../../core/models/shift.dart';
+import '../../core/models/time_entry.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
@@ -121,7 +122,11 @@ class _DashboardPassTab extends StatelessWidget {
             ),
           )
         else
-          _NextShiftCard(shift: nextShift, profile: profile),
+          _NextShiftCard(
+            shift: nextShift,
+            profile: profile,
+            onTap: () => _showShiftDetails(context, nextShift),
+          ),
         const SizedBox(height: AppSpacing.lg),
         _ShiftListCard(
           title: 'Available shifts',
@@ -137,67 +142,290 @@ class _DashboardPassTab extends StatelessWidget {
       ],
     );
   }
+
+  void _showShiftDetails(BuildContext context, Shift shift) {
+    final timeEntries = ref.read(timeEntriesProvider);
+    final openEntry = timeEntries.where((entry) => entry.isOpen).firstOrNull;
+    final companyPlan = ref.read(companyPlanProvider).toLowerCase();
+    final canUseTimeClock = companyPlan == 'pro' || companyPlan == 'enterprise';
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) => _ProfileShiftDetailSheet(
+        shift: shift,
+        openEntry: openEntry,
+        canUseTimeClock: canUseTimeClock,
+        onClockIn: () =>
+            ref.read(timeEntriesProvider.notifier).clockIn(shiftId: shift.id),
+        onClockOut: openEntry == null
+            ? null
+            : () => ref
+                .read(timeEntriesProvider.notifier)
+                .clockOut(entryId: openEntry.id),
+      ),
+    );
+  }
 }
 
 class _NextShiftCard extends StatelessWidget {
-  const _NextShiftCard({required this.shift, required this.profile});
+  const _NextShiftCard({
+    required this.shift,
+    required this.profile,
+    required this.onTap,
+  });
 
   final Shift shift;
   final EmployeeProfile profile;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return DashboardCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 34,
-            backgroundColor: AppColors.greenSoft,
-            backgroundImage: profilePhotoProvider(profile.profilePhotoUrl),
-            child: profilePhotoProvider(profile.profilePhotoUrl) != null
-                ? null
-                : Text(
-                    profile.initials,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 34,
+              backgroundColor: AppColors.greenSoft,
+              backgroundImage: profilePhotoProvider(profile.profilePhotoUrl),
+              child: profilePhotoProvider(profile.profilePhotoUrl) != null
+                  ? null
+                  : Text(
+                      profile.initials,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(profile.fullName, style: AppTypography.headingMedium),
+                  Text(
+                    profile.primaryRole,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.mutedText,
+                    ),
                   ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: AppSpacing.md),
+                  _DetailRow(
+                    icon: Icons.calendar_today_outlined,
+                    text: _formatShiftDate(shift.startsAt),
+                  ),
+                  _DetailRow(
+                    icon: Icons.schedule,
+                    text: '${_formatTime(shift.startsAt)} - '
+                        '${_formatTime(shift.endsAt)}',
+                  ),
+                  _DetailRow(
+                    icon: Icons.coffee_outlined,
+                    text: 'Break ${shift.breakMinutes} min',
+                  ),
+                  _DetailRow(
+                    icon: Icons.confirmation_number_outlined,
+                    text: 'Shift ID ${shift.id.toUpperCase()}',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileShiftDetailSheet extends StatefulWidget {
+  const _ProfileShiftDetailSheet({
+    required this.shift,
+    required this.openEntry,
+    required this.canUseTimeClock,
+    required this.onClockIn,
+    required this.onClockOut,
+  });
+
+  final Shift shift;
+  final TimeEntry? openEntry;
+  final bool canUseTimeClock;
+  final Future<void> Function() onClockIn;
+  final Future<void> Function()? onClockOut;
+
+  @override
+  State<_ProfileShiftDetailSheet> createState() =>
+      _ProfileShiftDetailSheetState();
+}
+
+class _ProfileShiftDetailSheetState extends State<_ProfileShiftDetailSheet> {
+  bool _clockLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final note = widget.shift.notes.trim();
+    final isClockedIn = widget.openEntry != null;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(profile.fullName, style: AppTypography.headingMedium),
-                Text(
-                  profile.primaryRole,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.mutedText,
+                CircleAvatar(
+                  radius: 27,
+                  backgroundColor: AppColors.greenSoft,
+                  child: Icon(
+                    Icons.event_available_rounded,
+                    color: AppColors.primaryGreen,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                _DetailRow(
-                  icon: Icons.calendar_today_outlined,
-                  text: _formatShiftDate(shift.startsAt),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.shift.role,
+                          style: AppTypography.headingMedium),
+                      Text(
+                        widget.shift.location,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _DetailRow(
-                  icon: Icons.schedule,
-                  text: '${_formatTime(shift.startsAt)} - '
-                      '${_formatTime(shift.endsAt)}',
-                ),
-                _DetailRow(
-                  icon: Icons.coffee_outlined,
-                  text: 'Break ${shift.breakMinutes} min',
-                ),
-                _DetailRow(
-                  icon: Icons.confirmation_number_outlined,
-                  text: 'Shift ID ${shift.id.toUpperCase()}',
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.md),
+            _DetailRow(
+              icon: Icons.calendar_today_outlined,
+              text: _formatShiftDate(widget.shift.startsAt),
+            ),
+            _DetailRow(
+              icon: Icons.schedule,
+              text: '${_formatTime(widget.shift.startsAt)} - '
+                  '${_formatTime(widget.shift.endsAt)}',
+            ),
+            _DetailRow(
+              icon: Icons.coffee_outlined,
+              text: 'Break ${widget.shift.breakMinutes} min',
+            ),
+            _DetailRow(
+              icon: Icons.notes_outlined,
+              text: note.isEmpty ? 'No manager note for this shift.' : note,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: widget.canUseTimeClock
+                    ? AppColors.background
+                    : AppColors.greenSoft,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.canUseTimeClock
+                        ? (isClockedIn
+                            ? Icons.timer_rounded
+                            : Icons.login_rounded)
+                        : Icons.lock_outline_rounded,
+                    color: widget.canUseTimeClock
+                        ? (isClockedIn
+                            ? AppColors.primaryGreen
+                            : AppColors.blueInfo)
+                        : AppColors.mutedText,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      widget.canUseTimeClock
+                          ? (isClockedIn
+                              ? 'Clocked in at ${_formatTime(widget.openEntry!.clockInAt)}'
+                              : 'Clock in for this shift')
+                          : 'Clock in/out is available on Pro and Enterprise.',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _clockLoading || !widget.canUseTimeClock
+                        ? null
+                        : _handleClockAction,
+                    child: _clockLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(widget.canUseTimeClock
+                            ? (isClockedIn ? 'Clock out' : 'Clock in')
+                            : 'Pro'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _handleClockAction() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _clockLoading = true);
+    try {
+      if (widget.openEntry == null) {
+        await widget.onClockIn();
+      } else {
+        await widget.onClockOut?.call();
+      }
+      if (!mounted) return;
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content:
+              Text(widget.openEntry == null ? 'Clocked in.' : 'Clocked out.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _clockLoading = false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(widget.openEntry == null
+              ? 'Could not clock in. Try again.'
+              : 'Could not clock out. Try again.'),
+        ),
+      );
+    }
   }
 }
 

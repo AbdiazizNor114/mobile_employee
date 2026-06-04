@@ -4,9 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/models/shift.dart';
-import '../../core/models/time_entry.dart';
 import '../../core/providers/mock_work_provider.dart';
-import '../../core/providers/service_providers.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
@@ -23,7 +21,6 @@ class HoursScreen extends ConsumerStatefulWidget {
 
 class _HoursScreenState extends ConsumerState<HoursScreen> {
   late DateTimeRange _selectedRange;
-  bool _clockLoading = false;
 
   @override
   void initState() {
@@ -38,14 +35,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
   @override
   Widget build(BuildContext context) {
     final shifts = ref.watch(shiftsProvider);
-    final timeEntries = ref.watch(timeEntriesProvider);
-    final companyPlan = ref.watch(companyPlanProvider).toLowerCase();
-    final canUseTimeClock = companyPlan == 'pro' || companyPlan == 'enterprise';
-    final openEntry = timeEntries.where((entry) => entry.isOpen).firstOrNull;
-    final nextShift = ref.watch(nextShiftProvider);
-    final workedDays = timeEntries.isNotEmpty
-        ? _workedDaysFromTimeEntries(timeEntries)
-        : _workedDaysFromShifts(shifts);
+    final workedDays = _workedDaysFromShifts(shifts);
     final visibleDays = workedDays.where((day) {
       return !day.date.isBefore(_selectedRange.start) &&
           !day.date.isAfter(_selectedRange.end);
@@ -81,16 +71,6 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
             const OfflineCacheBanner(),
-            const SizedBox(height: AppSpacing.md),
-            _ClockCard(
-              openEntry: openEntry,
-              nextShift: nextShift,
-              loading: _clockLoading,
-              canUseTimeClock: canUseTimeClock,
-              onClockIn: () => _clockIn(nextShift?.id),
-              onClockOut:
-                  openEntry == null ? null : () => _clockOut(openEntry.id),
-            ),
             const SizedBox(height: AppSpacing.md),
             DashboardCard(
               child: Column(
@@ -212,11 +192,11 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Worked days', style: AppTypography.headingMedium),
+                  Text('Booked days', style: AppTypography.headingMedium),
                   const SizedBox(height: AppSpacing.sm),
                   if (visibleDays.isEmpty)
                     Text(
-                      'No worked days in this range',
+                      'No booked shifts in this range',
                       style: AppTypography.bodyMedium.copyWith(
                         color: AppColors.mutedText,
                       ),
@@ -298,132 +278,6 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
       );
     });
   }
-
-  Future<void> _clockIn(String? shiftId) async {
-    setState(() => _clockLoading = true);
-    try {
-      await ref.read(timeEntriesProvider.notifier).clockIn(shiftId: shiftId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clocked in.')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not clock in. Try again.')),
-      );
-    } finally {
-      if (mounted) setState(() => _clockLoading = false);
-    }
-  }
-
-  Future<void> _clockOut(String entryId) async {
-    setState(() => _clockLoading = true);
-    try {
-      await ref.read(timeEntriesProvider.notifier).clockOut(entryId: entryId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clocked out.')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not clock out. Try again.')),
-      );
-    } finally {
-      if (mounted) setState(() => _clockLoading = false);
-    }
-  }
-}
-
-class _ClockCard extends StatelessWidget {
-  const _ClockCard({
-    required this.openEntry,
-    required this.nextShift,
-    required this.loading,
-    required this.canUseTimeClock,
-    required this.onClockIn,
-    required this.onClockOut,
-  });
-
-  final TimeEntry? openEntry;
-  final Shift? nextShift;
-  final bool loading;
-  final bool canUseTimeClock;
-  final VoidCallback onClockIn;
-  final VoidCallback? onClockOut;
-
-  @override
-  Widget build(BuildContext context) {
-    final isClockedIn = openEntry != null;
-    return DashboardCard(
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: isClockedIn ? AppColors.greenSoft : AppColors.background,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              isClockedIn ? Icons.timer_rounded : Icons.login_rounded,
-              color: isClockedIn ? AppColors.primaryGreen : AppColors.blueInfo,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  !canUseTimeClock
-                      ? 'Time clock locked'
-                      : isClockedIn
-                          ? 'Clocked in'
-                          : 'Ready to clock in',
-                  style: AppTypography.headingMedium,
-                ),
-                Text(
-                  !canUseTimeClock
-                      ? 'Clock in/out is available on Pro and Enterprise.'
-                      : isClockedIn
-                          ? 'Started ${_formatClockTime(openEntry!.clockInAt)}'
-                          : nextShift == null
-                              ? 'No shift selected'
-                              : '${nextShift!.role} at ${_formatClockTime(nextShift!.startsAt)}',
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: loading || !canUseTimeClock
-                ? null
-                : (isClockedIn ? onClockOut : onClockIn),
-            icon: loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    isClockedIn ? Icons.logout_rounded : Icons.login_rounded),
-            label: Text(!canUseTimeClock
-                ? 'Pro'
-                : isClockedIn
-                    ? 'Clock out'
-                    : 'Clock in'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 DateTimeRange _normalizeRange(DateTime start, DateTime end) {
@@ -452,34 +306,6 @@ List<_WorkedDay> _workedDaysFromShifts(List<Shift> shifts) {
       grouped[key] = _WorkedDay(
         date,
         existing.hours + totalHours,
-        existing.breakHours + breakHours,
-      );
-    }
-  }
-  final days = grouped.values.toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
-  return days;
-}
-
-List<_WorkedDay> _workedDaysFromTimeEntries(List<TimeEntry> entries) {
-  final grouped = <String, _WorkedDay>{};
-  for (final entry in entries) {
-    if (entry.clockOutAt == null) continue;
-    final date = DateTime(
-      entry.clockInAt.year,
-      entry.clockInAt.month,
-      entry.clockInAt.day,
-    );
-    final key = '${date.year}-${date.month}-${date.day}';
-    final hours = entry.workedMinutes / 60;
-    final breakHours = entry.breakMinutes / 60;
-    final existing = grouped[key];
-    if (existing == null) {
-      grouped[key] = _WorkedDay(date, hours, breakHours);
-    } else {
-      grouped[key] = _WorkedDay(
-        date,
-        existing.hours + hours,
         existing.breakHours + breakHours,
       );
     }
@@ -545,10 +371,6 @@ String _formatDate(DateTime date) {
 
 String _formatWorkedDay(DateTime date) {
   return '${_weekdayShort(date)} ${date.day} ${_monthShort(date)}';
-}
-
-String _formatClockTime(DateTime date) {
-  return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 }
 
 String _formatHours(double hours) {

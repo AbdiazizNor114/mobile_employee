@@ -4,8 +4,10 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/models/shift.dart';
+import '../../core/models/time_entry.dart';
 import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/mock_work_provider.dart';
+import '../../core/providers/service_providers.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
@@ -129,6 +131,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   void _showShiftDetails(BuildContext context, Shift shift) {
+    final timeEntries = ref.read(timeEntriesProvider);
+    final openEntry = timeEntries.where((entry) => entry.isOpen).firstOrNull;
+    final companyPlan = ref.read(companyPlanProvider).toLowerCase();
+    final canUseTimeClock = companyPlan == 'pro' || companyPlan == 'enterprise';
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -139,7 +145,16 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       ),
       builder: (context) => _ShiftDetailSheet(
         shift: shift,
+        openEntry: openEntry,
+        canUseTimeClock: canUseTimeClock,
         onAccept: () => ref.read(shiftsProvider.notifier).acceptShift(shift.id),
+        onClockIn: () =>
+            ref.read(timeEntriesProvider.notifier).clockIn(shiftId: shift.id),
+        onClockOut: openEntry == null
+            ? null
+            : () => ref
+                .read(timeEntriesProvider.notifier)
+                .clockOut(entryId: openEntry.id),
       ),
     );
   }
@@ -409,10 +424,21 @@ class _ScheduleShiftTile extends StatelessWidget {
 }
 
 class _ShiftDetailSheet extends StatefulWidget {
-  const _ShiftDetailSheet({required this.shift, required this.onAccept});
+  const _ShiftDetailSheet({
+    required this.shift,
+    required this.openEntry,
+    required this.canUseTimeClock,
+    required this.onAccept,
+    required this.onClockIn,
+    required this.onClockOut,
+  });
 
   final Shift shift;
+  final TimeEntry? openEntry;
+  final bool canUseTimeClock;
   final Future<void> Function() onAccept;
+  final Future<void> Function() onClockIn;
+  final Future<void> Function()? onClockOut;
 
   @override
   State<_ShiftDetailSheet> createState() => _ShiftDetailSheetState();
@@ -420,6 +446,7 @@ class _ShiftDetailSheet extends StatefulWidget {
 
 class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
   bool _isLoading = false;
+  bool _clockLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -517,6 +544,15 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
                       : 'No manager note for this shift.',
             ),
             const SizedBox(height: AppSpacing.lg),
+            if (widget.shift.status != ShiftStatus.available) ...[
+              _ClockActionCard(
+                openEntry: widget.openEntry,
+                canUseTimeClock: widget.canUseTimeClock,
+                loading: _clockLoading,
+                onPressed: _handleClockAction,
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -568,6 +604,118 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _handleClockAction() async {
+    if (!widget.canUseTimeClock || _clockLoading) return;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _clockLoading = true);
+    try {
+      if (widget.openEntry == null) {
+        await widget.onClockIn();
+      } else {
+        await widget.onClockOut?.call();
+      }
+      if (!mounted) return;
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content:
+              Text(widget.openEntry == null ? 'Clocked in.' : 'Clocked out.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _clockLoading = false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(widget.openEntry == null
+              ? 'Could not clock in. Try again.'
+              : 'Could not clock out. Try again.'),
+        ),
+      );
+    }
+  }
+}
+
+class _ClockActionCard extends StatelessWidget {
+  const _ClockActionCard({
+    required this.openEntry,
+    required this.canUseTimeClock,
+    required this.loading,
+    required this.onPressed,
+  });
+
+  final TimeEntry? openEntry;
+  final bool canUseTimeClock;
+  final bool loading;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final isClockedIn = openEntry != null;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: canUseTimeClock ? AppColors.background : AppColors.greenSoft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            canUseTimeClock
+                ? (isClockedIn ? Icons.timer_rounded : Icons.login_rounded)
+                : Icons.lock_outline_rounded,
+            color: canUseTimeClock
+                ? (isClockedIn ? AppColors.primaryGreen : AppColors.blueInfo)
+                : AppColors.mutedText,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  canUseTimeClock
+                      ? (isClockedIn ? 'Clocked in' : 'Clock in for shift')
+                      : 'Time clock locked',
+                  style: AppTypography.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  canUseTimeClock
+                      ? (isClockedIn
+                          ? 'Started ${_time(openEntry!.clockInAt)}'
+                          : 'Start tracking worked time.')
+                      : 'Clock in/out is available on Pro and Enterprise.',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilledButton(
+            onPressed: loading || !canUseTimeClock ? null : onPressed,
+            child: loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(canUseTimeClock
+                    ? (isClockedIn ? 'Clock out' : 'Clock in')
+                    : 'Pro'),
+          ),
+        ],
       ),
     );
   }
