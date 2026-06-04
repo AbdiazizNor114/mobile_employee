@@ -3,6 +3,7 @@ import '../models/absence_request.dart';
 import '../models/activity_item.dart';
 import '../models/employee_profile.dart';
 import '../models/shift.dart';
+import '../models/time_entry.dart';
 import '../services/storage_service.dart';
 import '../services/worker_sync_service.dart';
 import 'service_providers.dart';
@@ -237,6 +238,67 @@ class AbsenceRequestController extends StateNotifier<List<AbsenceRequest>> {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     state = sorted;
     storage.saveAbsenceRequests(state).then(onCacheUpdated);
+  }
+
+  void reset() {
+    state = const [];
+  }
+}
+
+final timeEntriesProvider =
+    StateNotifierProvider<TimeEntryController, List<TimeEntry>>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  final syncService = ref.watch(workerSyncServiceProvider);
+  final cachedEntries = storage.readTimeEntries();
+  return TimeEntryController(
+    cachedEntries ?? const [],
+    storage: storage,
+    syncService: syncService,
+    onCacheUpdated: (updatedAt) =>
+        ref.read(cacheLastUpdatedProvider.notifier).state = updatedAt,
+  );
+});
+
+class TimeEntryController extends StateNotifier<List<TimeEntry>> {
+  TimeEntryController(
+    super.state, {
+    required this.storage,
+    required this.syncService,
+    required this.onCacheUpdated,
+  });
+
+  final StorageService storage;
+  final WorkerSyncService syncService;
+  final void Function(DateTime updatedAt) onCacheUpdated;
+
+  Future<void> clockIn({String? shiftId}) async {
+    final entry = await syncService.clockIn(shiftId: shiftId);
+    state = [entry, ...state.where((item) => item.id != entry.id)];
+    storage.saveTimeEntries(state).then(onCacheUpdated);
+  }
+
+  Future<void> clockOut({
+    required String entryId,
+    int breakMinutes = 0,
+    String notes = '',
+  }) async {
+    final entry = await syncService.clockOut(
+      entryId: entryId,
+      breakMinutes: breakMinutes,
+      notes: notes,
+    );
+    state = [
+      for (final item in state)
+        if (item.id == entry.id) entry else item,
+    ];
+    storage.saveTimeEntries(state).then(onCacheUpdated);
+  }
+
+  void replaceAll(List<TimeEntry> entries) {
+    final sorted = [...entries]
+      ..sort((a, b) => b.clockInAt.compareTo(a.clockInAt));
+    state = sorted;
+    storage.saveTimeEntries(state).then(onCacheUpdated);
   }
 
   void reset() {

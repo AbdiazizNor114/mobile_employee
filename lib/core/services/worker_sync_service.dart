@@ -3,6 +3,7 @@ import '../models/absence_request.dart';
 import '../models/employee_profile.dart';
 import '../models/shift.dart';
 import '../models/message.dart';
+import '../models/time_entry.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 
@@ -13,6 +14,7 @@ class WorkerSyncPayload {
     required this.activities,
     required this.messages,
     required this.absenceRequests,
+    required this.timeEntries,
   });
 
   final EmployeeProfile profile;
@@ -20,6 +22,7 @@ class WorkerSyncPayload {
   final List<ActivityItem> activities;
   final List<AppMessage> messages;
   final List<AbsenceRequest> absenceRequests;
+  final List<TimeEntry> timeEntries;
 }
 
 class WorkerSyncService {
@@ -86,6 +89,15 @@ class WorkerSyncService {
       absenceRaw = (absenceResponse.data?['data'] as List?) ?? const [];
     } catch (_) {}
 
+    List timeEntryRaw = const [];
+    try {
+      final timeEntryResponse =
+          await _apiService.client.get<Map<String, dynamic>>(
+        '/api/v1/companies/$companyId/time-entries',
+      );
+      timeEntryRaw = (timeEntryResponse.data?['data'] as List?) ?? const [];
+    } catch (_) {}
+
     return WorkerSyncPayload(
       profile: _mapProfile(profileMap, memberships, employeeData, shiftsRaw),
       shifts: shiftsRaw
@@ -97,6 +109,7 @@ class WorkerSyncService {
       messages: messagesRaw.whereType<Map>().map(_mapMessage).toList(),
       absenceRequests:
           absenceRaw.whereType<Map>().map(_mapAbsenceRequest).toList(),
+      timeEntries: timeEntryRaw.whereType<Map>().map(_mapTimeEntry).toList(),
     );
   }
 
@@ -169,6 +182,45 @@ class WorkerSyncService {
       throw StateError('Missing absence response.');
     }
     return _mapAbsenceRequest(raw);
+  }
+
+  Future<TimeEntry> clockIn({String? shiftId}) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    final response = await _apiService.client.post<Map<String, dynamic>>(
+      '/api/v1/companies/$companyId/time-entries/clock-in',
+      data: {
+        if (shiftId != null && shiftId.trim().isNotEmpty) 'shiftId': shiftId,
+      },
+    );
+    final raw = (response.data?['data'] as Map?)?['entry'] as Map?;
+    if (raw == null) throw StateError('Missing time entry response.');
+    return _mapTimeEntry(raw);
+  }
+
+  Future<TimeEntry> clockOut({
+    required String entryId,
+    int breakMinutes = 0,
+    String notes = '',
+  }) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    final response = await _apiService.client.patch<Map<String, dynamic>>(
+      '/api/v1/companies/$companyId/time-entries/$entryId/clock-out',
+      data: {
+        'breakMinutes': breakMinutes,
+        'notes': notes,
+      },
+    );
+    final raw = (response.data?['data'] as Map?)?['entry'] as Map?;
+    if (raw == null) throw StateError('Missing time entry response.');
+    return _mapTimeEntry(raw);
   }
 
   EmployeeProfile _mapProfile(
@@ -290,6 +342,23 @@ class WorkerSyncService {
       note: (raw['notes'] as String?) ?? '',
       managerNote: (raw['manager_note'] as String?) ?? '',
       reviewedAt: DateTime.tryParse((raw['reviewed_at'] as String?) ?? ''),
+    );
+  }
+
+  TimeEntry _mapTimeEntry(Map raw) {
+    return TimeEntry(
+      id: (raw['id'] as String?) ?? '',
+      shiftId: raw['shift_id'] as String?,
+      clockInAt: DateTime.tryParse((raw['clock_in_at'] as String?) ?? '') ??
+          DateTime.now(),
+      clockOutAt: DateTime.tryParse((raw['clock_out_at'] as String?) ?? ''),
+      breakMinutes: raw['break_minutes'] as int? ?? 0,
+      workedMinutes: raw['worked_minutes'] as int? ?? 0,
+      notes: (raw['notes'] as String?) ?? '',
+      status: TimeEntryStatus.values.firstWhere(
+        (status) => status.name == raw['status'],
+        orElse: () => TimeEntryStatus.open,
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import '../models/absence_request.dart';
 import '../models/activity_item.dart';
 import '../models/employee_profile.dart';
 import '../models/shift.dart';
+import '../models/time_entry.dart';
 
 class StorageService {
   static const _boxName = 'shaqonet_offline_cache';
@@ -19,6 +20,7 @@ class StorageService {
   static const _companyNameKey = 'company_name';
   static const _messagesKey = 'messages';
   static const _absenceRequestsKey = 'absence_requests';
+  static const _timeEntriesKey = 'time_entries';
 
   Box<dynamic>? _box;
   final Map<String, Object?> _memoryFallback = {};
@@ -171,6 +173,23 @@ class StorageService {
     return touchLastUpdated();
   }
 
+  List<TimeEntry>? readTimeEntries() {
+    final data = _read(_timeEntriesKey);
+    if (data is! List) return null;
+    return data
+        .whereType<Map<dynamic, dynamic>>()
+        .map(TimeEntry.fromJson)
+        .toList();
+  }
+
+  Future<DateTime> saveTimeEntries(List<TimeEntry> entries) async {
+    await _write(
+      _timeEntriesKey,
+      entries.map((entry) => entry.toJson()).toList(),
+    );
+    return touchLastUpdated();
+  }
+
   Future<void> clearAuthSession() async {
     await _write(_accessTokenKey, null);
     await _write(_refreshTokenKey, null);
@@ -186,6 +205,7 @@ class StorageService {
     await _write(_activitiesKey, null);
     await _write(_messagesKey, null);
     await _write(_absenceRequestsKey, null);
+    await _write(_timeEntriesKey, null);
     await _write(_lastUpdatedKey, null);
   }
 

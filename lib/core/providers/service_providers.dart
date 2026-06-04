@@ -109,6 +109,7 @@ final resetWorkDataProvider = Provider<void Function()>((ref) {
     ref.read(activityProvider.notifier).reset();
     ref.read(messagesProvider.notifier).reset();
     ref.read(absenceRequestsProvider.notifier).reset();
+    ref.read(timeEntriesProvider.notifier).reset();
     ref.read(cacheLastUpdatedProvider.notifier).state = null;
   };
 });
