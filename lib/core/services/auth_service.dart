@@ -103,17 +103,10 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    // Sign out locally first so UI always returns to login immediately.
+    // Clear locally. A stale token can make /auth/logout return 401, which
+    // would trigger the unauthorized interceptor again and loop sign-out.
     await _storage.clearAuthSession();
     _apiService.setAuthToken(null);
     _authStateController.add(false);
-
-    try {
-      await _apiService.client
-          .post('/api/v1/auth/logout')
-          .timeout(const Duration(seconds: 5));
-    } catch (_) {
-      // Ignore network/logout failures; local session is already cleared.
-    }
   }
 }
