@@ -87,71 +87,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              Text(
-                l10n.appTitle,
-                style: AppTypography.headingLarge.copyWith(
-                  color: AppColors.darkText,
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - AppSpacing.lg * 2,
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(l10n.loginTitle, style: AppTypography.headingLarge),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                l10n.loginSubtitle,
-                style: AppTypography.bodyLarge.copyWith(
-                  color: AppColors.mutedText,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(labelText: l10n.email),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: l10n.password),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed:
-                      _isLoading ? null : () => context.go('/forgot-password'),
-                  child: const Text('Forgot password?'),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton(
-                onPressed: _isLoading ? null : _signIn,
-                child: Text(_isLoading ? 'Signing in...' : l10n.signIn),
-              ),
-              if (_message != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.greenSoft,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    _message!,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.mutedText,
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Spacer(),
+                    Text(
+                      l10n.appTitle,
+                      style: AppTypography.headingLarge.copyWith(
+                        color: AppColors.darkText,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(l10n.loginTitle, style: AppTypography.headingLarge),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      l10n.loginSubtitle,
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(labelText: l10n.email),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(labelText: l10n.password),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => context.go('/forgot-password'),
+                        child: const Text('Forgot password?'),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    FilledButton(
+                      onPressed: _isLoading ? null : _signIn,
+                      child: Text(_isLoading ? 'Signing in...' : l10n.signIn),
+                    ),
+                    if (_message != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: AppColors.greenSoft,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          _message!,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                  ],
                 ),
-              ],
-              const Spacer(),
-            ],
+              ),
+            ),
           ),
         ),
       ),

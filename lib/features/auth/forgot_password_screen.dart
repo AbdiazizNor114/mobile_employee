@@ -74,64 +74,77 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => context.go('/login'),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - AppSpacing.lg * 2,
               ),
-              const Spacer(),
-              Text('Reset password', style: AppTypography.headingLarge),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Enter your account email and we will send you a secure reset link.',
-                style: AppTypography.bodyLarge.copyWith(
-                  color: AppColors.mutedText,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _isLoading ? null : _sendReset(),
-                decoration: const InputDecoration(labelText: 'Email'),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton(
-                onPressed: _isLoading ? null : _sendReset,
-                child: Text(_isLoading ? 'Sending...' : 'Send reset link'),
-              ),
-              if (_message != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: _sent ? AppColors.greenSoft : AppColors.background,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: _sent ? AppColors.primaryGreen : AppColors.line,
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: () => context.go('/login'),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    _message!,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: _sent
-                          ? AppColors.primaryGreenDark
-                          : AppColors.mutedText,
+                    const Spacer(),
+                    Text('Reset password', style: AppTypography.headingLarge),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Enter your account email and we will send you a secure reset link.',
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.mutedText,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.xl),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _isLoading ? null : _sendReset(),
+                      decoration: const InputDecoration(labelText: 'Email'),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    FilledButton(
+                      onPressed: _isLoading ? null : _sendReset,
+                      child:
+                          Text(_isLoading ? 'Sending...' : 'Send reset link'),
+                    ),
+                    if (_message != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: _sent
+                              ? AppColors.greenSoft
+                              : AppColors.background,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color:
+                                _sent ? AppColors.primaryGreen : AppColors.line,
+                          ),
+                        ),
+                        child: Text(
+                          _message!,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: _sent
+                                ? AppColors.primaryGreenDark
+                                : AppColors.mutedText,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                  ],
                 ),
-              ],
-              const Spacer(),
-            ],
+              ),
+            ),
           ),
         ),
       ),
