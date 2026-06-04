@@ -120,6 +120,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 obscureText: true,
                 decoration: InputDecoration(labelText: l10n.password),
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed:
+                      _isLoading ? null : () => context.go('/forgot-password'),
+                  child: const Text('Forgot password?'),
+                ),
+              ),
               const SizedBox(height: AppSpacing.lg),
               FilledButton(
                 onPressed: _isLoading ? null : _signIn,

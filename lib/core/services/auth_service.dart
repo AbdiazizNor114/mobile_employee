@@ -89,6 +89,18 @@ class AuthService {
     _authStateController.add(true);
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty || !trimmed.contains('@')) {
+      throw ArgumentError('Please enter a valid email address.');
+    }
+
+    await _apiService.client.post<Map<String, dynamic>>(
+      '/api/v1/auth/password/forgot',
+      data: {'email': trimmed},
+    );
+  }
+
   bool get hasActiveSession => _storage.readAccessToken() != null;
 
   String? get companyId => _storage.readCompanyId();

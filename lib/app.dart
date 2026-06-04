@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/constants/app_colors.dart';
 import 'core/providers/service_providers.dart';
+import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/profile/edit_profile_screen.dart';
 import 'features/home/employee_shell.dart';
@@ -26,15 +27,20 @@ class _ShaqoNetEmployeeAppState extends ConsumerState<ShaqoNetEmployeeApp> {
     redirect: (context, state) {
       final isSignedIn = ref.read(currentSessionProvider);
       final isLogin = state.matchedLocation == '/login';
+      final isForgotPassword = state.matchedLocation == '/forgot-password';
 
-      if (!isSignedIn && !isLogin) return '/login';
-      if (isSignedIn && isLogin) return '/';
+      if (!isSignedIn && !isLogin && !isForgotPassword) return '/login';
+      if (isSignedIn && (isLogin || isForgotPassword)) return '/';
       return null;
     },
     routes: [
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/',
@@ -58,7 +64,7 @@ class _ShaqoNetEmployeeAppState extends ConsumerState<ShaqoNetEmployeeApp> {
   Widget build(BuildContext context) {
     ref.listen(isSignedInProvider, (previous, next) => _routerRefresh.value++);
     ref.listen(demoSessionProvider, (previous, next) => _routerRefresh.value++);
-    
+
     final languageCode = ref.watch(languageCodeProvider);
 
     return MaterialApp.router(
