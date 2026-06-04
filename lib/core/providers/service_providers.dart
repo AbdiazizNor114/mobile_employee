@@ -49,6 +49,10 @@ final companyNameProvider = Provider<String>((ref) {
   return ref.watch(storageServiceProvider).readCompanyName();
 });
 
+final companyPlanProvider = StateProvider<String>((ref) {
+  return ref.watch(storageServiceProvider).readCompanyPlan();
+});
+
 final languageCodeProvider =
     StateNotifierProvider<LanguageCodeController, String>((ref) {
   final storage = ref.watch(storageServiceProvider);
@@ -110,6 +114,7 @@ final resetWorkDataProvider = Provider<void Function()>((ref) {
     ref.read(messagesProvider.notifier).reset();
     ref.read(absenceRequestsProvider.notifier).reset();
     ref.read(timeEntriesProvider.notifier).reset();
+    ref.read(companyPlanProvider.notifier).state = 'free';
     ref.read(cacheLastUpdatedProvider.notifier).state = null;
   };
 });

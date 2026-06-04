@@ -10,6 +10,7 @@ import 'auth_service.dart';
 class WorkerSyncPayload {
   const WorkerSyncPayload({
     required this.profile,
+    required this.companyPlan,
     required this.shifts,
     required this.activities,
     required this.messages,
@@ -18,6 +19,7 @@ class WorkerSyncPayload {
   });
 
   final EmployeeProfile profile;
+  final String companyPlan;
   final List<Shift> shifts;
   final List<ActivityItem> activities;
   final List<AppMessage> messages;
@@ -47,6 +49,17 @@ class WorkerSyncService {
     final meData = (meResponse.data?['data'] as Map?) ?? const {};
     final profileMap = (meData['profile'] as Map?) ?? const {};
     final List memberships = (meData['memberships'] as List?) ?? const [];
+
+    String companyPlan = 'free';
+    try {
+      final companyResponse =
+          await _apiService.client.get<Map<String, dynamic>>(
+        '/api/v1/companies/$companyId',
+      );
+      final companyData = (companyResponse.data?['data'] as Map?) ?? const {};
+      final company = (companyData['company'] as Map?) ?? const {};
+      companyPlan = ((company['plan'] as String?) ?? 'free').toLowerCase();
+    } catch (_) {}
 
     Map employeeData = const {};
     try {
@@ -100,6 +113,7 @@ class WorkerSyncService {
 
     return WorkerSyncPayload(
       profile: _mapProfile(profileMap, memberships, employeeData, shiftsRaw),
+      companyPlan: companyPlan,
       shifts: shiftsRaw
           .whereType<Map>()
           .map((raw) => _mapShift(raw, membershipId))

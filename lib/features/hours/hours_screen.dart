@@ -6,6 +6,7 @@ import '../../core/constants/app_typography.dart';
 import '../../core/models/shift.dart';
 import '../../core/models/time_entry.dart';
 import '../../core/providers/mock_work_provider.dart';
+import '../../core/providers/service_providers.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
@@ -38,6 +39,8 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
   Widget build(BuildContext context) {
     final shifts = ref.watch(shiftsProvider);
     final timeEntries = ref.watch(timeEntriesProvider);
+    final companyPlan = ref.watch(companyPlanProvider).toLowerCase();
+    final canUseTimeClock = companyPlan == 'pro' || companyPlan == 'enterprise';
     final openEntry = timeEntries.where((entry) => entry.isOpen).firstOrNull;
     final nextShift = ref.watch(nextShiftProvider);
     final workedDays = timeEntries.isNotEmpty
@@ -83,6 +86,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               openEntry: openEntry,
               nextShift: nextShift,
               loading: _clockLoading,
+              canUseTimeClock: canUseTimeClock,
               onClockIn: () => _clockIn(nextShift?.id),
               onClockOut:
                   openEntry == null ? null : () => _clockOut(openEntry.id),
@@ -337,6 +341,7 @@ class _ClockCard extends StatelessWidget {
     required this.openEntry,
     required this.nextShift,
     required this.loading,
+    required this.canUseTimeClock,
     required this.onClockIn,
     required this.onClockOut,
   });
@@ -344,6 +349,7 @@ class _ClockCard extends StatelessWidget {
   final TimeEntry? openEntry;
   final Shift? nextShift;
   final bool loading;
+  final bool canUseTimeClock;
   final VoidCallback onClockIn;
   final VoidCallback? onClockOut;
 
@@ -371,15 +377,21 @@ class _ClockCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isClockedIn ? 'Clocked in' : 'Ready to clock in',
+                  !canUseTimeClock
+                      ? 'Time clock locked'
+                      : isClockedIn
+                          ? 'Clocked in'
+                          : 'Ready to clock in',
                   style: AppTypography.headingMedium,
                 ),
                 Text(
-                  isClockedIn
-                      ? 'Started ${_formatClockTime(openEntry!.clockInAt)}'
-                      : nextShift == null
-                          ? 'No shift selected'
-                          : '${nextShift!.role} at ${_formatClockTime(nextShift!.startsAt)}',
+                  !canUseTimeClock
+                      ? 'Clock in/out is available on Pro and Enterprise.'
+                      : isClockedIn
+                          ? 'Started ${_formatClockTime(openEntry!.clockInAt)}'
+                          : nextShift == null
+                              ? 'No shift selected'
+                              : '${nextShift!.role} at ${_formatClockTime(nextShift!.startsAt)}',
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.mutedText,
                   ),
@@ -388,7 +400,9 @@ class _ClockCard extends StatelessWidget {
             ),
           ),
           FilledButton.icon(
-            onPressed: loading ? null : (isClockedIn ? onClockOut : onClockIn),
+            onPressed: loading || !canUseTimeClock
+                ? null
+                : (isClockedIn ? onClockOut : onClockIn),
             icon: loading
                 ? const SizedBox(
                     width: 18,
@@ -400,7 +414,11 @@ class _ClockCard extends StatelessWidget {
                   )
                 : Icon(
                     isClockedIn ? Icons.logout_rounded : Icons.login_rounded),
-            label: Text(isClockedIn ? 'Clock out' : 'Clock in'),
+            label: Text(!canUseTimeClock
+                ? 'Pro'
+                : isClockedIn
+                    ? 'Clock out'
+                    : 'Clock in'),
           ),
         ],
       ),

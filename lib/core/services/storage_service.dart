@@ -18,6 +18,7 @@ class StorageService {
   static const _membershipIdKey = 'membership_id';
   static const _userIdKey = 'user_id';
   static const _companyNameKey = 'company_name';
+  static const _companyPlanKey = 'company_plan';
   static const _messagesKey = 'messages';
   static const _absenceRequestsKey = 'absence_requests';
   static const _timeEntriesKey = 'time_entries';
@@ -146,6 +147,16 @@ class StorageService {
         _companyNameKey, companyName.trim().isEmpty ? 'ShaqoNet' : companyName);
   }
 
+  String readCompanyPlan() {
+    final value = _read(_companyPlanKey);
+    return value is String && value.trim().isNotEmpty ? value : 'free';
+  }
+
+  Future<void> saveCompanyPlan(String plan) async {
+    final normalized = plan.trim().toLowerCase();
+    await _write(_companyPlanKey, normalized.isEmpty ? 'free' : normalized);
+  }
+
   List<Map>? readMessages() {
     final data = _read(_messagesKey);
     if (data is! List) return null;
@@ -197,6 +208,7 @@ class StorageService {
     await _write(_membershipIdKey, null);
     await _write(_userIdKey, null);
     await _write(_companyNameKey, null);
+    await _write(_companyPlanKey, null);
   }
 
   Future<void> clearWorkCache() async {

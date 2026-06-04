@@ -19,6 +19,8 @@ final backendSyncProvider = FutureProvider<void>((ref) async {
         .read(absenceRequestsProvider.notifier)
         .replaceAll(payload.absenceRequests);
     ref.read(timeEntriesProvider.notifier).replaceAll(payload.timeEntries);
+    await ref.read(storageServiceProvider).saveCompanyPlan(payload.companyPlan);
+    ref.read(companyPlanProvider.notifier).state = payload.companyPlan;
     ref.read(lastSyncErrorProvider.notifier).state = null;
   } on StateError catch (_) {
     // Missing IDs, likely signing out
