@@ -151,6 +151,22 @@ class WorkerSyncService {
     );
   }
 
+  Future<void> sendMessageToManagers(String content) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    await _apiService.client.post(
+      '/api/v1/companies/$companyId/messages',
+      data: {
+        'subject': 'Worker message',
+        'content': content,
+        'recipientRole': 'manager',
+      },
+    );
+  }
+
   Future<void> updateProfile(EmployeeProfile profile) async {
     final companyId = _authService.companyId;
     final membershipId = _authService.membershipId;

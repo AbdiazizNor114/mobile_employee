@@ -18,7 +18,12 @@ class AppMessage {
       id: (json['id'] as String?) ?? '',
       senderName: (json['sender_name'] as String?) ?? 'System',
       content: (json['content'] as String?) ?? '',
-      sentAt: DateTime.tryParse(json['sent_at'] as String? ?? '') ?? DateTime.now(),
+      sentAt: DateTime.tryParse(
+            (json['sent_at'] as String?) ??
+                (json['created_at'] as String?) ??
+                '',
+          ) ??
+          DateTime.now(),
       isRead: (json['is_read'] as bool?) ?? false,
     );
   }
@@ -28,6 +33,7 @@ class AppMessage {
         'sender_name': senderName,
         'content': content,
         'sent_at': sentAt.toIso8601String(),
+        'created_at': sentAt.toIso8601String(),
         'is_read': isRead,
       };
 }

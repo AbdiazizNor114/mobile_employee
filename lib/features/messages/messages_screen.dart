@@ -6,6 +6,7 @@ import '../../core/constants/app_typography.dart';
 import '../../core/models/message.dart';
 import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/message_provider.dart';
+import '../../core/providers/service_providers.dart';
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -16,6 +17,88 @@ class MessagesScreen extends ConsumerStatefulWidget {
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   bool _showUnreadOnly = false;
+  bool _isSending = false;
+
+  bool get _canReply {
+    final plan = ref.read(companyPlanProvider).toLowerCase();
+    return plan == 'pro' || plan == 'enterprise';
+  }
+
+  Future<void> _refreshMessages() async {
+    ref.invalidate(backendSyncProvider);
+    await ref.read(backendSyncProvider.future);
+  }
+
+  Future<void> _sendMessage(String content) async {
+    final message = content.trim();
+    if (message.isEmpty || _isSending) return;
+
+    setState(() => _isSending = true);
+    try {
+      await ref.read(workerSyncServiceProvider).sendMessageToManagers(message);
+      await _refreshMessages();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message sent to your manager.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not send message. Retry sync and try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _openComposer() async {
+    if (!_canReply) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Worker replies are available on Pro and Enterprise.'),
+        ),
+      );
+      return;
+    }
+
+    final content = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _MessageComposerSheet(),
+    );
+
+    if (content != null) await _sendMessage(content);
+  }
+
+  Future<void> _openMessage(AppMessage message) async {
+    if (!message.isRead) {
+      await ref.read(messagesProvider.notifier).markAsRead(message.id);
+    }
+
+    if (!mounted) return;
+    final reply = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MessageDetailSheet(
+        message: message,
+        canReply: _canReply,
+      ),
+    );
+
+    if (reply != null) await _sendMessage(reply);
+  }
+
+  Future<void> _markAllRead(List<AppMessage> messages) async {
+    for (final message in messages) {
+      if (!message.isRead) {
+        await ref.read(messagesProvider.notifier).markAsRead(message.id);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +107,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         ? messages.where((message) => !message.isRead).toList()
         : messages;
     final unreadCount = messages.where((message) => !message.isRead).length;
+    final plan = ref.watch(companyPlanProvider).toLowerCase();
+    final canReply = plan == 'pro' || plan == 'enterprise';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -52,31 +137,25 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Managers send messages from dashboard. Reply composer is coming next.',
+                  onPressed: _isSending ? null : _openComposer,
+                  icon: _isSending
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          canReply
+                              ? Icons.edit_outlined
+                              : Icons.lock_outline_rounded,
                         ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.edit_outlined),
                   color: AppColors.cardBackground,
                 ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_horiz_rounded),
                   color: AppColors.cardBackground,
                   onSelected: (value) {
-                    if (value == 'mark_all_read') {
-                      for (final message in messages) {
-                        if (!message.isRead) {
-                          ref
-                              .read(messagesProvider.notifier)
-                              .markAsRead(message.id);
-                        }
-                      }
-                    }
+                    if (value == 'mark_all_read') _markAllRead(messages);
                   },
                   itemBuilder: (context) => const [
                     PopupMenuItem(
@@ -90,7 +169,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => ref.refresh(backendSyncProvider.future),
+              onRefresh: _refreshMessages,
               child: visibleMessages.isEmpty
                   ? const _NoMessagesView()
                   : ListView.separated(
@@ -106,7 +185,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       itemBuilder: (context, index) {
                         if (index == 0) {
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.sm),
                             child: Row(
                               children: [
                                 _FilterChip(
@@ -130,19 +210,208 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         final message = visibleMessages[index - 1];
                         return _MessageRow(
                           message: message,
-                          onTap: () {
-                            if (!message.isRead) {
-                              ref
-                                  .read(messagesProvider.notifier)
-                                  .markAsRead(message.id);
-                            }
-                          },
+                          onTap: () => _openMessage(message),
                         );
                       },
                     ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MessageDetailSheet extends StatelessWidget {
+  const _MessageDetailSheet({
+    required this.message,
+    required this.canReply,
+  });
+
+  final AppMessage message;
+  final bool canReply;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      message.senderName,
+                      style: AppTypography.headingMedium,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                _relativeTimeLabel(message.sentAt),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.mutedText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  message.content,
+                  style: AppTypography.bodyLarge.copyWith(height: 1.45),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: FilledButton.icon(
+                onPressed: canReply
+                    ? () async {
+                        final reply = await showModalBottomSheet<String>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => const _MessageComposerSheet(),
+                        );
+                        if (context.mounted) Navigator.of(context).pop(reply);
+                      }
+                    : null,
+                icon: Icon(
+                  canReply ? Icons.reply_rounded : Icons.lock_outline_rounded,
+                ),
+                label: Text(
+                  canReply
+                      ? 'Reply to manager'
+                      : 'Replies are Pro and Enterprise',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageComposerSheet extends StatefulWidget {
+  const _MessageComposerSheet();
+
+  @override
+  State<_MessageComposerSheet> createState() => _MessageComposerSheetState();
+}
+
+class _MessageComposerSheetState extends State<_MessageComposerSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) return;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.xl,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Message manager',
+                      style: AppTypography.headingMedium,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Send a work update, question, or request directly to your manager.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.mutedText,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextField(
+                controller: _controller,
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 2000,
+                autofocus: true,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(
+                  labelText: 'Message',
+                  hintText: 'Write your message...',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton.icon(
+                onPressed: _submit,
+                icon: const Icon(Icons.send_rounded),
+                label: const Text('Send message'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -279,7 +548,8 @@ class _MessageRow extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.bodyLarge.copyWith(
-                  color: message.isRead ? AppColors.mutedText : AppColors.darkText,
+                  color:
+                      message.isRead ? AppColors.mutedText : AppColors.darkText,
                 ),
               ),
               if (!message.isRead) ...[

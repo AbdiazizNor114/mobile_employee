@@ -28,6 +28,7 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
   int _currentIndex = 0;
   Timer? _autoSyncTimer;
   bool _syncInFlight = false;
+  bool _manualSyncInFlight = false;
 
   @override
   void initState() {
@@ -52,16 +53,26 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
     _autoSyncTimer = Timer.periodic(_autoSyncInterval, (_) => _syncNow());
   }
 
-  Future<void> _syncNow() async {
-    if (!mounted || _syncInFlight) return;
+  Future<void> _syncNow({bool force = false}) async {
+    if (!mounted || (_syncInFlight && !force)) return;
     _syncInFlight = true;
     try {
-      final refreshFuture = ref.refresh(backendSyncProvider.future);
-      await refreshFuture;
+      ref.invalidate(backendSyncProvider);
+      await ref.read(backendSyncProvider.future);
     } catch (_) {
       // Surface errors via providers/UI; keep timer alive.
     } finally {
       _syncInFlight = false;
+    }
+  }
+
+  Future<void> _retrySync() async {
+    if (_manualSyncInFlight) return;
+    setState(() => _manualSyncInFlight = true);
+    try {
+      await _syncNow(force: true);
+    } finally {
+      if (mounted) setState(() => _manualSyncInFlight = false);
     }
   }
 
@@ -110,8 +121,10 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () => ref.refresh(backendSyncProvider),
-                        child: const Text('Retry'),
+                        onPressed: _manualSyncInFlight ? null : _retrySync,
+                        child: Text(
+                          _manualSyncInFlight ? 'Retrying...' : 'Retry',
+                        ),
                       ),
                     ],
                   ),
@@ -119,7 +132,11 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
               ),
             ),
           if (syncState.hasError && !hasData)
-            _SyncErrorOverlay(error: syncState.error),
+            _SyncErrorOverlay(
+              error: syncState.error,
+              isRetrying: _manualSyncInFlight,
+              onRetry: _retrySync,
+            ),
         ],
       ),
       bottomNavigationBar: ShaqoNetBottomNavBar(
@@ -145,9 +162,15 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
 }
 
 class _SyncErrorOverlay extends ConsumerWidget {
-  const _SyncErrorOverlay({required this.error});
+  const _SyncErrorOverlay({
+    required this.error,
+    required this.isRetrying,
+    required this.onRetry,
+  });
 
   final Object? error;
+  final bool isRetrying;
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -174,8 +197,8 @@ class _SyncErrorOverlay extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
               FilledButton(
-                onPressed: () => ref.refresh(backendSyncProvider),
-                child: const Text('Retry Sync'),
+                onPressed: isRetrying ? null : onRetry,
+                child: Text(isRetrying ? 'Retrying...' : 'Retry Sync'),
               ),
               TextButton(
                 onPressed: () => ref.read(signOutProvider)(),
