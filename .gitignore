@@ -3,4 +3,7 @@ build/
 ios/Pods/
 android/.gradle/
 .env
+.env.*
+!.env.example
+!.env.testflight.example
 .DS_Store

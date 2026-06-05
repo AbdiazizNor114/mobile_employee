@@ -1,17 +1,37 @@
-# shaqonet_employee
+# ShaqoNet Employee
 
-A new Flutter project.
+Flutter worker mobile app for ShaqoNet.
 
-## Getting Started
+## Local Checks
 
-This project is a starting point for a Flutter application.
+```bash
+flutter analyze lib test
+flutter test
+flutter build ios --no-codesign
+```
 
-A few resources to get you started if this is your first Flutter project:
+## TestFlight Build
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Create a local release config:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+cp .env.testflight.example .env.testflight
+```
+
+Fill `.env.testflight` with production-safe public values:
+
+```bash
+SHAQONET_API_BASE_URL=https://your-production-api
+SHAQONET_SUPABASE_URL=https://your-project.supabase.co
+SHAQONET_SUPABASE_ANON_KEY=your-public-anon-key
+BUILD_NAME=0.1.0
+BUILD_NUMBER=1
+```
+
+Build the IPA:
+
+```bash
+./scripts/build_testflight.sh
+```
+
+The script refuses local API URLs so a TestFlight build cannot accidentally point at `localhost`.
