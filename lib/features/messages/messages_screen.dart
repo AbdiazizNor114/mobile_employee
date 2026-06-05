@@ -8,6 +8,10 @@ import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/message_provider.dart';
 import '../../core/providers/service_providers.dart';
 
+enum _MessageFilter { inbox, unread, sent }
+
+enum _ComposeAudience { managers, teamHub }
+
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
 
@@ -16,30 +20,40 @@ class MessagesScreen extends ConsumerStatefulWidget {
 }
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
-  bool _showUnreadOnly = false;
+  _MessageFilter _filter = _MessageFilter.inbox;
   bool _isSending = false;
 
-  bool get _canReply {
-    final plan = ref.read(companyPlanProvider).toLowerCase();
-    return plan == 'pro' || plan == 'enterprise';
+  Color _accentForPlan(String plan) {
+    return AppColors.primaryGreen;
   }
+
+  bool _canCompose(String plan) => plan == 'pro' || plan == 'enterprise';
+  bool _canUseTeamHub(String plan) => plan == 'enterprise';
 
   Future<void> _refreshMessages() async {
     ref.invalidate(backendSyncProvider);
     await ref.read(backendSyncProvider.future);
   }
 
-  Future<void> _sendMessage(String content) async {
-    final message = content.trim();
-    if (message.isEmpty || _isSending) return;
-
+  Future<void> _sendMessage(_ComposeResult result) async {
+    if (_isSending) return;
     setState(() => _isSending = true);
     try {
-      await ref.read(workerSyncServiceProvider).sendMessageToManagers(message);
+      await ref.read(workerSyncServiceProvider).sendWorkerMessage(
+            subject: result.subject,
+            content: result.content,
+            sendToAll: result.audience == _ComposeAudience.teamHub,
+          );
       await _refreshMessages();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message sent to your manager.')),
+        SnackBar(
+          content: Text(
+            result.audience == _ComposeAudience.teamHub
+                ? 'Posted to team hub.'
+                : 'Message sent to your manager.',
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -53,48 +67,54 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     }
   }
 
-  Future<void> _openComposer() async {
-    if (!_canReply) {
+  Future<void> _openComposer(String plan) async {
+    if (!_canCompose(plan)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Worker replies are available on Pro and Enterprise.'),
-        ),
+        const SnackBar(content: Text('Messages are read-only on this plan.')),
       );
       return;
     }
 
-    final content = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const _MessageComposerSheet(),
+    final result = await Navigator.of(context).push<_ComposeResult>(
+      MaterialPageRoute(
+        builder: (context) => _ComposeMessagePage(
+          accent: _accentForPlan(plan),
+          canUseTeamHub: _canUseTeamHub(plan),
+        ),
+      ),
     );
-
-    if (content != null) await _sendMessage(content);
+    if (result != null) await _sendMessage(result);
   }
 
-  Future<void> _openMessage(AppMessage message) async {
-    if (!message.isRead) {
+  Future<void> _openMessage({
+    required AppMessage message,
+    required bool isSent,
+    required String plan,
+  }) async {
+    if (!isSent && !message.isRead) {
       await ref.read(messagesProvider.notifier).markAsRead(message.id);
     }
 
     if (!mounted) return;
-    final reply = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _MessageDetailSheet(
-        message: message,
-        canReply: _canReply,
+    final result = await Navigator.of(context).push<_ComposeResult>(
+      MaterialPageRoute(
+        builder: (context) => _MessageDetailPage(
+          message: message,
+          accent: _accentForPlan(plan),
+          isSent: isSent,
+          canReply: _canCompose(plan),
+          canUseTeamHub: _canUseTeamHub(plan),
+        ),
       ),
     );
-
-    if (reply != null) await _sendMessage(reply);
+    if (result != null) await _sendMessage(result);
   }
 
-  Future<void> _markAllRead(List<AppMessage> messages) async {
+  Future<void> _markAllRead(
+      List<AppMessage> messages, String? membershipId) async {
     for (final message in messages) {
-      if (!message.isRead) {
+      final isSent = message.senderMemberId == membershipId;
+      if (!isSent && !message.isRead) {
         await ref.read(messagesProvider.notifier).markAsRead(message.id);
       }
     }
@@ -103,66 +123,58 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(messagesProvider);
-    final visibleMessages = _showUnreadOnly
-        ? messages.where((message) => !message.isRead).toList()
-        : messages;
-    final unreadCount = messages.where((message) => !message.isRead).length;
     final plan = ref.watch(companyPlanProvider).toLowerCase();
-    final canReply = plan == 'pro' || plan == 'enterprise';
+    final membershipId = ref.watch(authServiceProvider).membershipId;
+    final accent = _accentForPlan(plan);
+    final isEnterprise = plan == 'enterprise';
+    final canCompose = _canCompose(plan);
+    final unreadCount = messages
+        .where((message) =>
+            message.senderMemberId != membershipId && !message.isRead)
+        .length;
+
+    final visibleMessages = messages.where((message) {
+      final isSent = message.senderMemberId == membershipId;
+      return switch (_filter) {
+        _MessageFilter.inbox => !isSent,
+        _MessageFilter.unread => !isSent && !message.isRead,
+        _MessageFilter.sent => isSent,
+      };
+    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
+          _MessagesHeader(
+            accent: accent,
+            title: isEnterprise ? 'Team Hub' : 'Messages',
+            isSending: _isSending,
+            canCompose: canCompose,
+            onCompose: () => _openComposer(plan),
+            onMarkAllRead: () => _markAllRead(messages, membershipId),
+          ),
           Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              MediaQuery.paddingOf(context).top + AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            decoration: const BoxDecoration(
-              color: AppColors.primaryGreen,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
-            ),
+            color: AppColors.cardBackground,
             child: Row(
               children: [
-                Expanded(
-                  child: Text(
-                    'Messages',
-                    style: AppTypography.headingMedium.copyWith(
-                      color: AppColors.cardBackground,
-                    ),
-                  ),
+                _MailboxTab(
+                  label: 'Inbox',
+                  isSelected: _filter == _MessageFilter.inbox,
+                  accent: accent,
+                  onTap: () => setState(() => _filter = _MessageFilter.inbox),
                 ),
-                IconButton(
-                  onPressed: _isSending ? null : _openComposer,
-                  icon: _isSending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          canReply
-                              ? Icons.edit_outlined
-                              : Icons.lock_outline_rounded,
-                        ),
-                  color: AppColors.cardBackground,
+                _MailboxTab(
+                  label: 'Unread $unreadCount',
+                  isSelected: _filter == _MessageFilter.unread,
+                  accent: accent,
+                  onTap: () => setState(() => _filter = _MessageFilter.unread),
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_horiz_rounded),
-                  color: AppColors.cardBackground,
-                  onSelected: (value) {
-                    if (value == 'mark_all_read') _markAllRead(messages);
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: 'mark_all_read',
-                      child: Text('Mark all as read'),
-                    ),
-                  ],
+                _MailboxTab(
+                  label: 'Sent',
+                  isSelected: _filter == _MessageFilter.sent,
+                  accent: accent,
+                  onTap: () => setState(() => _filter = _MessageFilter.sent),
                 ),
               ],
             ),
@@ -171,46 +183,24 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             child: RefreshIndicator(
               onRefresh: _refreshMessages,
               child: visibleMessages.isEmpty
-                  ? const _NoMessagesView()
+                  ? _NoMessagesView(filter: _filter)
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.xxl,
-                      ),
-                      itemCount: visibleMessages.length + 1,
+                      padding: EdgeInsets.zero,
+                      itemCount: visibleMessages.length,
                       separatorBuilder: (context, index) =>
                           const Divider(height: 1, color: AppColors.line),
                       itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Padding(
-                            padding:
-                                const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: Row(
-                              children: [
-                                _FilterChip(
-                                  label: 'All',
-                                  isSelected: !_showUnreadOnly,
-                                  onTap: () =>
-                                      setState(() => _showUnreadOnly = false),
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                _FilterChip(
-                                  label: 'Unread ($unreadCount)',
-                                  isSelected: _showUnreadOnly,
-                                  onTap: () =>
-                                      setState(() => _showUnreadOnly = true),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        final message = visibleMessages[index - 1];
+                        final message = visibleMessages[index];
+                        final isSent = message.senderMemberId == membershipId;
                         return _MessageRow(
                           message: message,
-                          onTap: () => _openMessage(message),
+                          isSent: isSent,
+                          accent: accent,
+                          onTap: () => _openMessage(
+                            message: message,
+                            isSent: isSent,
+                            plan: plan,
+                          ),
                         );
                       },
                     ),
@@ -222,278 +212,109 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   }
 }
 
-class _MessageDetailSheet extends StatelessWidget {
-  const _MessageDetailSheet({
-    required this.message,
-    required this.canReply,
+class _MessagesHeader extends StatelessWidget {
+  const _MessagesHeader({
+    required this.accent,
+    required this.title,
+    required this.isSending,
+    required this.canCompose,
+    required this.onCompose,
+    required this.onMarkAllRead,
   });
 
-  final AppMessage message;
-  final bool canReply;
+  final Color accent;
+  final String title;
+  final bool isSending;
+  final bool canCompose;
+  final VoidCallback onCompose;
+  final VoidCallback onMarkAllRead;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+      width: double.infinity,
+      color: accent,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        MediaQuery.paddingOf(context).top + AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.sm,
-                AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      message.senderName,
-                      style: AppTypography.headingMedium,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: AppTypography.headingLarge.copyWith(
+                color: AppColors.cardBackground,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Text(
-                _relativeTimeLabel(message.sentAt),
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.mutedText,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: Text(
-                  message.content,
-                  style: AppTypography.bodyLarge.copyWith(height: 1.45),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.xl,
-              ),
-              child: FilledButton.icon(
-                onPressed: canReply
-                    ? () async {
-                        final reply = await showModalBottomSheet<String>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => const _MessageComposerSheet(),
-                        );
-                        if (context.mounted) Navigator.of(context).pop(reply);
-                      }
-                    : null,
-                icon: Icon(
-                  canReply ? Icons.reply_rounded : Icons.lock_outline_rounded,
-                ),
-                label: Text(
-                  canReply
-                      ? 'Reply to manager'
-                      : 'Replies are Pro and Enterprise',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MessageComposerSheet extends StatefulWidget {
-  const _MessageComposerSheet();
-
-  @override
-  State<_MessageComposerSheet> createState() => _MessageComposerSheetState();
-}
-
-class _MessageComposerSheetState extends State<_MessageComposerSheet> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final value = _controller.text.trim();
-    if (value.isEmpty) return;
-    Navigator.of(context).pop(value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.xl,
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Message manager',
-                      style: AppTypography.headingMedium,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Send a work update, question, or request directly to your manager.',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.mutedText,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              TextField(
-                controller: _controller,
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 2000,
-                autofocus: true,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  labelText: 'Message',
-                  hintText: 'Write your message...',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton.icon(
-                onPressed: _submit,
-                icon: const Icon(Icons.send_rounded),
-                label: const Text('Send message'),
+          ),
+          IconButton(
+            onPressed: isSending ? null : onCompose,
+            icon: isSending
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(canCompose ? Icons.edit_outlined : Icons.lock_outline),
+            color: AppColors.cardBackground,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz_rounded),
+            color: AppColors.cardBackground,
+            onSelected: (value) {
+              if (value == 'read') onMarkAllRead();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'read',
+                child: Text('Mark all as read'),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-String _relativeTimeLabel(DateTime value) {
-  final diff = DateTime.now().difference(value);
-  if (diff.inMinutes < 1) return 'now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
-  final day = value.day.toString().padLeft(2, '0');
-  final month = value.month.toString().padLeft(2, '0');
-  return '$day/$month';
-}
-
-class _NoMessagesView extends StatelessWidget {
-  const _NoMessagesView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.mark_email_unread_outlined,
-              color: AppColors.primaryGreen,
-              size: 42,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text('No messages yet', style: AppTypography.headingMedium),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'New team updates will appear here automatically.',
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.mutedText,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+class _MailboxTab extends StatelessWidget {
+  const _MailboxTab({
     required this.label,
     required this.isSelected,
+    required this.accent,
     required this.onTap,
   });
 
   final String label;
   final bool isSelected;
+  final Color accent;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.greenSoft : AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryGreen : AppColors.line,
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 54,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isSelected ? accent : Colors.transparent,
+                width: 3,
+              ),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.caption.copyWith(
-            color: isSelected ? AppColors.primaryGreenDark : AppColors.darkText,
-            fontWeight: FontWeight.w700,
+          child: Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: isSelected ? accent : AppColors.mutedText,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),
@@ -502,71 +323,485 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _MessageRow extends StatelessWidget {
-  const _MessageRow({required this.message, required this.onTap});
+  const _MessageRow({
+    required this.message,
+    required this.isSent,
+    required this.accent,
+    required this.onTap,
+  });
 
   final AppMessage message;
+  final bool isSent;
+  final Color accent;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final unread = !isSent && !message.isRead;
+
     return Material(
-      color: message.isRead ? AppColors.background : AppColors.cardBackground,
+      color: AppColors.cardBackground,
       child: InkWell(
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
+            horizontal: AppSpacing.md,
             vertical: AppSpacing.md,
           ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      message.senderName,
-                      style: AppTypography.headingSmall.copyWith(
-                        fontWeight:
-                            message.isRead ? FontWeight.w700 : FontWeight.w800,
+              CircleAvatar(
+                radius: 22,
+                backgroundColor:
+                    unread ? accent.withValues(alpha: 0.14) : AppColors.line,
+                child: Text(
+                  _initials(message.senderName),
+                  style: AppTypography.caption.copyWith(
+                    color: unread ? accent : AppColors.darkText,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            isSent ? 'You' : message.senderName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.bodyLarge.copyWith(
+                              fontWeight:
+                                  unread ? FontWeight.w800 : FontWeight.w700,
+                              color: AppColors.darkText,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          _dateLabel(message.sentAt),
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      message.subject,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyLarge.copyWith(
+                        color:
+                            unread ? AppColors.darkText : AppColors.mutedText,
+                        fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    _relativeTimeLabel(message.sentAt),
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.mutedText,
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      message.content,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.mutedText,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                message.content,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.bodyLarge.copyWith(
-                  color:
-                      message.isRead ? AppColors.mutedText : AppColors.darkText,
+                  ],
                 ),
               ),
-              if (!message.isRead) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Container(
-                  height: 6,
-                  width: 6,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryGreen,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _MessageDetailPage extends StatelessWidget {
+  const _MessageDetailPage({
+    required this.message,
+    required this.accent,
+    required this.isSent,
+    required this.canReply,
+    required this.canUseTeamHub,
+  });
+
+  final AppMessage message;
+  final Color accent;
+  final bool isSent;
+  final bool canReply;
+  final bool canUseTeamHub;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: accent,
+        foregroundColor: AppColors.cardBackground,
+        title: Text(
+            isSent ? 'Sent message' : 'Message from ${message.senderName}'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.line),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: accent.withValues(alpha: 0.14),
+                      child: Text(
+                        _initials(message.senderName),
+                        style: AppTypography.caption.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        isSent ? 'You' : message.senderName,
+                        style: AppTypography.headingSmall,
+                      ),
+                    ),
+                    Text(
+                      _dateLabel(message.sentAt),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  message.subject,
+                  style: AppTypography.headingLarge.copyWith(
+                    color: AppColors.darkText,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const Divider(color: AppColors.line),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  message.content,
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.darkText,
+                    height: 1.65,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (canReply)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final result =
+                          await Navigator.of(context).push<_ComposeResult>(
+                        MaterialPageRoute(
+                          builder: (context) => _ComposeMessagePage(
+                            accent: accent,
+                            canUseTeamHub: canUseTeamHub,
+                            initialSubject: 'Re: ${message.subject}',
+                          ),
+                        ),
+                      );
+                      if (context.mounted) Navigator.of(context).pop(result);
+                    },
+                    icon: const Icon(Icons.reply_rounded),
+                    label: const Text('Reply'),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComposeMessagePage extends StatefulWidget {
+  const _ComposeMessagePage({
+    required this.accent,
+    required this.canUseTeamHub,
+    this.initialSubject = '',
+  });
+
+  final Color accent;
+  final bool canUseTeamHub;
+  final String initialSubject;
+
+  @override
+  State<_ComposeMessagePage> createState() => _ComposeMessagePageState();
+}
+
+class _ComposeMessagePageState extends State<_ComposeMessagePage> {
+  late final TextEditingController _subjectController;
+  final _contentController = TextEditingController();
+  _ComposeAudience _audience = _ComposeAudience.managers;
+
+  @override
+  void initState() {
+    super.initState();
+    _subjectController = TextEditingController(text: widget.initialSubject);
+  }
+
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final subject = _subjectController.text.trim();
+    final content = _contentController.text.trim();
+    if (subject.isEmpty || content.isEmpty) return;
+    Navigator.of(context).pop(
+      _ComposeResult(
+        subject: subject,
+        content: content,
+        audience: _audience,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: widget.accent,
+        foregroundColor: AppColors.cardBackground,
+        title: const Text('Write message'),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          Text('Subject', style: AppTypography.headingSmall),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            controller: _subjectController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              hintText: 'What is this about?',
+              filled: true,
+              fillColor: AppColors.cardBackground,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('Audience', style: AppTypography.headingSmall),
+          const SizedBox(height: AppSpacing.sm),
+          _AudienceOption(
+            title: 'Managers',
+            subtitle: 'Send directly to your managers.',
+            value: _ComposeAudience.managers,
+            groupValue: _audience,
+            accent: widget.accent,
+            onChanged: (value) => setState(() => _audience = value),
+          ),
+          if (widget.canUseTeamHub)
+            _AudienceOption(
+              title: 'Team hub',
+              subtitle: 'Post so active coworkers can see it.',
+              value: _ComposeAudience.teamHub,
+              groupValue: _audience,
+              accent: widget.accent,
+              onChanged: (value) => setState(() => _audience = value),
+            ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('Message', style: AppTypography.headingSmall),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            controller: _contentController,
+            minLines: 7,
+            maxLines: 12,
+            maxLength: 2000,
+            decoration: const InputDecoration(
+              hintText: 'Write your message...',
+              filled: true,
+              fillColor: AppColors.cardBackground,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          FilledButton.icon(
+            onPressed: _submit,
+            icon: const Icon(Icons.send_rounded),
+            label: const Text('Send message'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AudienceOption extends StatelessWidget {
+  const _AudienceOption({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.groupValue,
+    required this.accent,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final _ComposeAudience value;
+  final _ComposeAudience groupValue;
+  final Color accent;
+  final ValueChanged<_ComposeAudience> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value == groupValue;
+
+    return Material(
+      color: AppColors.cardBackground,
+      child: InkWell(
+        onTap: () => onChanged(value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? accent : AppColors.mutedText,
+                    width: 2,
+                  ),
+                ),
+                child: selected
+                    ? Center(
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppTypography.bodyLarge),
+                    Text(
+                      subtitle,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComposeResult {
+  const _ComposeResult({
+    required this.subject,
+    required this.content,
+    required this.audience,
+  });
+
+  final String subject;
+  final String content;
+  final _ComposeAudience audience;
+}
+
+class _NoMessagesView extends StatelessWidget {
+  const _NoMessagesView({required this.filter});
+
+  final _MessageFilter filter;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (filter) {
+      _MessageFilter.inbox => 'No messages yet',
+      _MessageFilter.unread => 'No unread messages',
+      _MessageFilter.sent => 'No sent messages',
+    };
+
+    return ListView(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.mark_email_unread_outlined,
+                color: AppColors.mutedText,
+                size: 42,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(label, style: AppTypography.headingMedium),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _initials(String value) {
+  final parts = value.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+  final letters = parts.take(2).map((p) => p[0].toUpperCase()).join();
+  return letters.isEmpty ? 'SN' : letters;
+}
+
+String _dateLabel(DateTime value) {
+  final now = DateTime.now();
+  if (now.year == value.year &&
+      now.month == value.month &&
+      now.day == value.day) {
+    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  }
+  return '${value.day}/${value.month}/${value.year}';
 }

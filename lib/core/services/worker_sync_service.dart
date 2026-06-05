@@ -151,7 +151,11 @@ class WorkerSyncService {
     );
   }
 
-  Future<void> sendMessageToManagers(String content) async {
+  Future<void> sendWorkerMessage({
+    required String subject,
+    required String content,
+    bool sendToAll = false,
+  }) async {
     final companyId = _authService.companyId;
     if (companyId == null) {
       throw StateError('Missing company context.');
@@ -160,9 +164,9 @@ class WorkerSyncService {
     await _apiService.client.post(
       '/api/v1/companies/$companyId/messages',
       data: {
-        'subject': 'Worker message',
+        'subject': subject.trim().isEmpty ? 'Worker message' : subject.trim(),
         'content': content,
-        'recipientRole': 'manager',
+        if (sendToAll) 'sendToAll': true else 'recipientRole': 'manager',
       },
     );
   }

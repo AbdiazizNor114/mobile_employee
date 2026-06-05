@@ -52,8 +52,11 @@ class MessageController extends StateNotifier<List<AppMessage>> {
           AppMessage(
             id: m.id,
             senderName: m.senderName,
+            subject: m.subject,
             content: m.content,
             sentAt: m.sentAt,
+            senderMemberId: m.senderMemberId,
+            recipientMemberId: m.recipientMemberId,
             isRead: true,
           )
         else
