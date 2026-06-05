@@ -273,7 +273,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             style: AppTypography.headingMedium),
                         children: [
                           Text(
-                            'Emergency contact, certificates, and employment notes will be added in a later backend slice.',
+                            'Emergency contact, certificates, and employment notes are managed by your workplace.',
                             style: AppTypography.bodyMedium
                                 .copyWith(color: AppColors.mutedText),
                           ),
