@@ -151,6 +151,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             title: isEnterprise ? 'Team Hub' : 'Messages',
             isSending: _isSending,
             canCompose: canCompose,
+            unreadCount: unreadCount,
             onCompose: () => _openComposer(plan),
             onMarkAllRead: () => _markAllRead(messages, membershipId),
           ),
@@ -218,6 +219,7 @@ class _MessagesHeader extends StatelessWidget {
     required this.title,
     required this.isSending,
     required this.canCompose,
+    required this.unreadCount,
     required this.onCompose,
     required this.onMarkAllRead,
   });
@@ -226,6 +228,7 @@ class _MessagesHeader extends StatelessWidget {
   final String title;
   final bool isSending;
   final bool canCompose;
+  final int unreadCount;
   final VoidCallback onCompose;
   final VoidCallback onMarkAllRead;
 
@@ -243,14 +246,51 @@ class _MessagesHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: AppTypography.headingLarge.copyWith(
-                color: AppColors.cardBackground,
-              ),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    style: AppTypography.headingLarge.copyWith(
+                      color: AppColors.cardBackground,
+                    ),
+                  ),
+                ),
+                if (unreadCount > 0) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: AppColors.cardBackground.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      '$unreadCount unread',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.cardBackground,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           IconButton(
+            tooltip: 'Mark all as read',
+            onPressed: unreadCount == 0 ? null : onMarkAllRead,
+            icon: const Icon(Icons.mark_email_read_outlined),
+            color: AppColors.cardBackground,
+            disabledColor: AppColors.cardBackground.withValues(alpha: 0.45),
+          ),
+          IconButton(
+            tooltip: canCompose ? 'Write message' : 'Messages are read-only',
             onPressed: isSending ? null : onCompose,
             icon: isSending
                 ? const SizedBox(
@@ -260,19 +300,7 @@ class _MessagesHeader extends StatelessWidget {
                   )
                 : Icon(canCompose ? Icons.edit_outlined : Icons.lock_outline),
             color: AppColors.cardBackground,
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz_rounded),
-            color: AppColors.cardBackground,
-            onSelected: (value) {
-              if (value == 'read') onMarkAllRead();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: 'read',
-                child: Text('Mark all as read'),
-              ),
-            ],
+            disabledColor: AppColors.cardBackground.withValues(alpha: 0.45),
           ),
         ],
       ),
@@ -370,9 +398,20 @@ class _MessageRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
+                        if (unread) ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                        ],
                         Expanded(
                           child: Text(
-                            isSent ? 'You' : message.senderName,
+                            message.subject,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.bodyLarge.copyWith(
@@ -392,12 +431,11 @@ class _MessageRow extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      message.subject,
-                      maxLines: 2,
+                      isSent ? 'You' : message.senderName,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodyLarge.copyWith(
-                        color:
-                            unread ? AppColors.darkText : AppColors.mutedText,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.mutedText,
                         fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
