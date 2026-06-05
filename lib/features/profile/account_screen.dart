@@ -162,17 +162,31 @@ class AccountScreen extends ConsumerWidget {
                         children: [
                           Text('Documents', style: AppTypography.headingMedium),
                           const SizedBox(height: AppSpacing.sm),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Employment certificate will be available after backend connection.'),
+                          Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: AppColors.greenSoft,
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.picture_as_pdf_outlined),
-                            label: const Text('Employment certificate'),
+                                child: const Icon(
+                                  Icons.description_outlined,
+                                  color: AppColors.primaryGreen,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Text(
+                                  'Employment documents are managed by your workplace.',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.mutedText,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

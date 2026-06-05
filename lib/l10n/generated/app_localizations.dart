@@ -239,7 +239,7 @@ abstract class AppLocalizations {
   /// No description provided for @downloadPlaceholder.
   ///
   /// In en, this message translates to:
-  /// **'Download available in a later slice'**
+  /// **'Contact your workplace for this document'**
   String get downloadPlaceholder;
 
   /// No description provided for @logout.
@@ -251,7 +251,7 @@ abstract class AppLocalizations {
   /// No description provided for @offlineReady.
   ///
   /// In en, this message translates to:
-  /// **'Offline-ready mock data'**
+  /// **'Offline-ready synced data'**
   String get offlineReady;
 
   /// No description provided for @lastUpdated.

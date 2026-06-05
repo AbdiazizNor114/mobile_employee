@@ -23,8 +23,8 @@
   "aiInsight": "AI insight",
   "language": "Language",
   "employmentCertificate": "Employment certificate",
-  "downloadPlaceholder": "Download available in a later slice",
+  "downloadPlaceholder": "Contact your workplace for this document",
   "logout": "Logout",
-  "offlineReady": "Offline-ready mock data",
+  "offlineReady": "Offline-ready synced data",
   "lastUpdated": "Last updated just now"
 }

@@ -79,13 +79,14 @@ class AppLocalizationsSo extends AppLocalizations {
   String get employmentCertificate => 'Shahaado shaqo';
 
   @override
-  String get downloadPlaceholder => 'Soo dejin ayaa iman doonta';
+  String get downloadPlaceholder =>
+      'La xiriir goobtaada shaqada si aad dukumentigan u hesho';
 
   @override
   String get logout => 'Ka bax';
 
   @override
-  String get offlineReady => 'Xog tijaabo oo offline ah';
+  String get offlineReady => 'Xog shaqo oo offline diyaar u ah';
 
   @override
   String get lastUpdated => 'Hadda ayaa la cusboonaysiiyay';

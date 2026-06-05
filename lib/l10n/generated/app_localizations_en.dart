@@ -79,13 +79,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get employmentCertificate => 'Employment certificate';
 
   @override
-  String get downloadPlaceholder => 'Download available in a later slice';
+  String get downloadPlaceholder => 'Contact your workplace for this document';
 
   @override
   String get logout => 'Logout';
 
   @override
-  String get offlineReady => 'Offline-ready mock data';
+  String get offlineReady => 'Offline-ready synced data';
 
   @override
   String get lastUpdated => 'Last updated just now';
