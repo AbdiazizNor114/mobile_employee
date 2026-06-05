@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/providers/backend_sync_provider.dart';
+import '../../core/providers/message_provider.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/widgets/dashboard_card.dart';
@@ -81,6 +82,14 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
     final syncState = ref.watch(backendSyncProvider);
     final syncError = ref.watch(lastSyncErrorProvider);
     final unreadActivityCount = ref.watch(unreadActivityCountProvider);
+    final membershipId = ref.watch(authServiceProvider).membershipId;
+    final unreadMessageCount = ref
+        .watch(messagesProvider)
+        .where(
+          (message) =>
+              message.senderMemberId != membershipId && !message.isRead,
+        )
+        .length;
     final hasData = ref.watch(employeeProfileProvider).firstName.isNotEmpty;
 
     const screens = [
@@ -143,6 +152,7 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         unreadActivityCount: unreadActivityCount,
+        unreadMessageCount: unreadMessageCount,
       ),
     );
   }

@@ -9,11 +9,13 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
     required this.selectedIndex,
     required this.onDestinationSelected,
     this.unreadActivityCount = 0,
+    this.unreadMessageCount = 0,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final int unreadActivityCount;
+  final int unreadMessageCount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,19 +38,25 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
           label: labels.schedule,
         ),
         NavigationDestination(
-          icon: _ActivityNavIcon(
+          icon: _NavIconWithBadge(
             icon: Icons.notifications_none_rounded,
             unreadCount: unreadActivityCount,
           ),
-          selectedIcon: _ActivityNavIcon(
+          selectedIcon: _NavIconWithBadge(
             icon: Icons.notifications_rounded,
             unreadCount: unreadActivityCount,
           ),
           label: labels.activity,
         ),
         NavigationDestination(
-          icon: Icon(Icons.chat_bubble_outline_rounded),
-          selectedIcon: Icon(Icons.chat_bubble_rounded),
+          icon: _NavIconWithBadge(
+            icon: Icons.chat_bubble_outline_rounded,
+            unreadCount: unreadMessageCount,
+          ),
+          selectedIcon: _NavIconWithBadge(
+            icon: Icons.chat_bubble_rounded,
+            unreadCount: unreadMessageCount,
+          ),
           label: labels.messages,
         ),
         NavigationDestination(
@@ -97,8 +105,8 @@ class _NavLabels {
   }
 }
 
-class _ActivityNavIcon extends StatelessWidget {
-  const _ActivityNavIcon({required this.icon, required this.unreadCount});
+class _NavIconWithBadge extends StatelessWidget {
+  const _NavIconWithBadge({required this.icon, required this.unreadCount});
 
   final IconData icon;
   final int unreadCount;
