@@ -972,14 +972,14 @@ String _requestErrorMessage(Object error) {
       return serverMessage;
     }
     if (statusCode == 404) {
-      return 'Absence requests are not available on this API yet. Restart with the local API.';
+      return 'Absence requests are not available for this workplace yet.';
     }
     if (statusCode == 401 || statusCode == 403) {
       return 'Your session cannot send this request. Sign in again and retry.';
     }
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout) {
-      return 'Could not reach the API. Check the mobile app API URL.';
+      return 'Could not reach ShaqoNet. Check your connection and try again.';
     }
   }
   return 'Could not send request. Pull to refresh and try again.';

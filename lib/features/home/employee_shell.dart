@@ -201,7 +201,7 @@ class _SyncErrorOverlay extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'We could not fetch your work data. Check your connection or API configuration.',
+                'We could not fetch your work data. Check your connection and try again.',
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMedium,
               ),
