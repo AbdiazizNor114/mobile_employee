@@ -59,7 +59,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not send message. Retry sync and try again.'),
+          content: Text('Could not post. Retry sync and try again.'),
         ),
       );
     } finally {
@@ -70,7 +70,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   Future<void> _openComposer(String plan) async {
     if (!_canCompose(plan)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Messages are read-only on this plan.')),
+        const SnackBar(content: Text('Team updates are read-only on this plan.')),
       );
       return;
     }
@@ -80,6 +80,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         builder: (context) => _ComposeMessagePage(
           accent: _accentForPlan(plan),
           canUseTeamHub: _canUseTeamHub(plan),
+          hubOnly: _canUseTeamHub(plan),
         ),
       ),
     );
@@ -151,6 +152,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             title: isEnterprise ? 'Team Hub' : 'Messages',
             isSending: _isSending,
             canCompose: canCompose,
+            isHub: isEnterprise,
             unreadCount: unreadCount,
             onCompose: () => _openComposer(plan),
             onMarkAllRead: () => _markAllRead(messages, membershipId),
@@ -219,6 +221,7 @@ class _MessagesHeader extends StatelessWidget {
     required this.title,
     required this.isSending,
     required this.canCompose,
+    required this.isHub,
     required this.unreadCount,
     required this.onCompose,
     required this.onMarkAllRead,
@@ -228,6 +231,7 @@ class _MessagesHeader extends StatelessWidget {
   final String title;
   final bool isSending;
   final bool canCompose;
+  final bool isHub;
   final int unreadCount;
   final VoidCallback onCompose;
   final VoidCallback onMarkAllRead;
@@ -290,7 +294,9 @@ class _MessagesHeader extends StatelessWidget {
             disabledColor: AppColors.cardBackground.withValues(alpha: 0.45),
           ),
           IconButton(
-            tooltip: canCompose ? 'Write message' : 'Messages are read-only',
+            tooltip: canCompose
+                ? (isHub ? 'Post hub comment' : 'Write message')
+                : 'Team updates are read-only',
             onPressed: isSending ? null : onCompose,
             icon: isSending
                 ? const SizedBox(
@@ -482,7 +488,10 @@ class _MessageDetailPage extends StatelessWidget {
         backgroundColor: accent,
         foregroundColor: AppColors.cardBackground,
         title: Text(
-            isSent ? 'Sent message' : 'Message from ${message.senderName}'),
+          canUseTeamHub
+              ? (isSent ? 'Your hub comment' : 'Hub comment')
+              : (isSent ? 'Sent message' : 'Message from ${message.senderName}'),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -565,6 +574,7 @@ class _MessageDetailPage extends StatelessWidget {
                           builder: (context) => _ComposeMessagePage(
                             accent: accent,
                             canUseTeamHub: canUseTeamHub,
+                            hubOnly: canUseTeamHub,
                             initialSubject: 'Re: ${message.subject}',
                           ),
                         ),
@@ -572,7 +582,7 @@ class _MessageDetailPage extends StatelessWidget {
                       if (context.mounted) Navigator.of(context).pop(result);
                     },
                     icon: const Icon(Icons.reply_rounded),
-                    label: const Text('Reply'),
+                    label: Text(canUseTeamHub ? 'Comment in hub' : 'Reply'),
                   ),
                 ),
               ],
@@ -587,11 +597,13 @@ class _ComposeMessagePage extends StatefulWidget {
   const _ComposeMessagePage({
     required this.accent,
     required this.canUseTeamHub,
+    this.hubOnly = false,
     this.initialSubject = '',
   });
 
   final Color accent;
   final bool canUseTeamHub;
+  final bool hubOnly;
   final String initialSubject;
 
   @override
@@ -601,12 +613,14 @@ class _ComposeMessagePage extends StatefulWidget {
 class _ComposeMessagePageState extends State<_ComposeMessagePage> {
   late final TextEditingController _subjectController;
   final _contentController = TextEditingController();
-  _ComposeAudience _audience = _ComposeAudience.managers;
+  late _ComposeAudience _audience;
 
   @override
   void initState() {
     super.initState();
     _subjectController = TextEditingController(text: widget.initialSubject);
+    _audience =
+        widget.hubOnly ? _ComposeAudience.teamHub : _ComposeAudience.managers;
   }
 
   @override
@@ -636,7 +650,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
       appBar: AppBar(
         backgroundColor: widget.accent,
         foregroundColor: AppColors.cardBackground,
-        title: const Text('Write message'),
+        title: Text(widget.hubOnly ? 'Post hub comment' : 'Write message'),
         actions: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -647,47 +661,70 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          Text('Subject', style: AppTypography.headingSmall),
+          Text(widget.hubOnly ? 'Hub topic' : 'Subject',
+              style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _subjectController,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              hintText: 'What is this about?',
+            decoration: InputDecoration(
+              hintText:
+                  widget.hubOnly ? 'What should the team track?' : 'What is this about?',
               filled: true,
               fillColor: AppColors.cardBackground,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('Audience', style: AppTypography.headingSmall),
-          const SizedBox(height: AppSpacing.sm),
-          _AudienceOption(
-            title: 'Managers',
-            subtitle: 'Send directly to your managers.',
-            value: _ComposeAudience.managers,
-            groupValue: _audience,
-            accent: widget.accent,
-            onChanged: (value) => setState(() => _audience = value),
-          ),
-          if (widget.canUseTeamHub)
+          if (!widget.hubOnly) ...[
+            Text('Audience', style: AppTypography.headingSmall),
+            const SizedBox(height: AppSpacing.sm),
             _AudienceOption(
-              title: 'Team hub',
-              subtitle: 'Post so active coworkers can see it.',
-              value: _ComposeAudience.teamHub,
+              title: 'Managers',
+              subtitle: 'Send directly to your managers.',
+              value: _ComposeAudience.managers,
               groupValue: _audience,
               accent: widget.accent,
               onChanged: (value) => setState(() => _audience = value),
             ),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Message', style: AppTypography.headingSmall),
+            if (widget.canUseTeamHub)
+              _AudienceOption(
+                title: 'Team hub',
+                subtitle: 'Post so active coworkers can see it.',
+                value: _ComposeAudience.teamHub,
+                groupValue: _audience,
+                accent: widget.accent,
+                onChanged: (value) => setState(() => _audience = value),
+              ),
+            const SizedBox(height: AppSpacing.lg),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Text(
+                'Enterprise comments are posted to the Team Hub so everyone works from the same record.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.mutedText,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          Text(widget.hubOnly ? 'Comment' : 'Message',
+              style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _contentController,
             minLines: 7,
             maxLines: 12,
             maxLength: 2000,
-            decoration: const InputDecoration(
-              hintText: 'Write your message...',
+            decoration: InputDecoration(
+              hintText: widget.hubOnly
+                  ? 'Add a hub comment for your team...'
+                  : 'Write your message...',
               filled: true,
               fillColor: AppColors.cardBackground,
             ),
@@ -695,8 +732,8 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
             onPressed: _submit,
-            icon: const Icon(Icons.send_rounded),
-            label: const Text('Send message'),
+            icon: Icon(widget.hubOnly ? Icons.forum_outlined : Icons.send_rounded),
+            label: Text(widget.hubOnly ? 'Post comment' : 'Send message'),
           ),
         ],
       ),

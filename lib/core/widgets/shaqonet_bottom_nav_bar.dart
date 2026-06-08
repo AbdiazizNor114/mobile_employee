@@ -20,6 +20,8 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final labels = _NavLabels.forLanguage(ref.watch(languageCodeProvider));
+    final isEnterpriseHub =
+        ref.watch(companyPlanProvider).toLowerCase() == 'enterprise';
 
     return NavigationBar(
       selectedIndex: selectedIndex,
@@ -50,14 +52,16 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
         ),
         NavigationDestination(
           icon: _NavIconWithBadge(
-            icon: Icons.chat_bubble_outline_rounded,
+            icon: isEnterpriseHub
+                ? Icons.forum_outlined
+                : Icons.chat_bubble_outline_rounded,
             unreadCount: unreadMessageCount,
           ),
           selectedIcon: _NavIconWithBadge(
-            icon: Icons.chat_bubble_rounded,
+            icon: isEnterpriseHub ? Icons.forum_rounded : Icons.chat_bubble_rounded,
             unreadCount: unreadMessageCount,
           ),
-          label: labels.messages,
+          label: isEnterpriseHub ? labels.hub : labels.messages,
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline_rounded),
@@ -75,6 +79,7 @@ class _NavLabels {
     required this.schedule,
     required this.activity,
     required this.messages,
+    required this.hub,
     required this.profile,
   });
 
@@ -82,6 +87,7 @@ class _NavLabels {
   final String schedule;
   final String activity;
   final String messages;
+  final String hub;
   final String profile;
 
   factory _NavLabels.forLanguage(String languageCode) {
@@ -91,6 +97,7 @@ class _NavLabels {
         schedule: 'Jadwal',
         activity: 'Hawlaha',
         messages: 'Farriimaha',
+        hub: 'Hub',
         profile: 'Profile',
       );
     }
@@ -100,6 +107,7 @@ class _NavLabels {
       schedule: 'Schedule',
       activity: 'Activity',
       messages: 'Messages',
+      hub: 'Hub',
       profile: 'Profile',
     );
   }
