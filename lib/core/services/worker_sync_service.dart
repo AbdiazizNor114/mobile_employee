@@ -11,18 +11,24 @@ class WorkerSyncPayload {
   const WorkerSyncPayload({
     required this.profile,
     required this.companyPlan,
+    required this.enabledLanguages,
+    required this.defaultLanguage,
     required this.shifts,
     required this.activities,
     required this.messages,
+    required this.staffContacts,
     required this.absenceRequests,
     required this.timeEntries,
   });
 
   final EmployeeProfile profile;
   final String companyPlan;
+  final List<String> enabledLanguages;
+  final String defaultLanguage;
   final List<Shift> shifts;
   final List<ActivityItem> activities;
   final List<AppMessage> messages;
+  final List<StaffContact> staffContacts;
   final List<AbsenceRequest> absenceRequests;
   final List<TimeEntry> timeEntries;
 }
@@ -51,6 +57,8 @@ class WorkerSyncService {
     final List memberships = (meData['memberships'] as List?) ?? const [];
 
     String companyPlan = 'free';
+    List<String> enabledLanguages = const ['en'];
+    String defaultLanguage = 'en';
     try {
       final companyResponse =
           await _apiService.client.get<Map<String, dynamic>>(
@@ -59,6 +67,14 @@ class WorkerSyncService {
       final companyData = (companyResponse.data?['data'] as Map?) ?? const {};
       final company = (companyData['company'] as Map?) ?? const {};
       companyPlan = ((company['plan'] as String?) ?? 'free').toLowerCase();
+      enabledLanguages =
+          ((company['enabled_languages'] as List?) ?? const ['en'])
+              .whereType<String>()
+              .where((code) => const {'en', 'so', 'sw'}.contains(code))
+              .toSet()
+              .toList();
+      if (!enabledLanguages.contains('en')) enabledLanguages.insert(0, 'en');
+      defaultLanguage = (company['default_language'] as String?) ?? 'en';
     } catch (_) {}
 
     Map employeeData = const {};
@@ -93,6 +109,15 @@ class WorkerSyncService {
       messagesRaw = (messagesResponse.data?['data'] as List?) ?? const [];
     } catch (_) {}
 
+    List contactsRaw = const [];
+    try {
+      final contactsResponse =
+          await _apiService.client.get<Map<String, dynamic>>(
+        '/api/v1/companies/$companyId/employees/contacts',
+      );
+      contactsRaw = (contactsResponse.data?['data'] as List?) ?? const [];
+    } catch (_) {}
+
     List absenceRaw = const [];
     try {
       final absenceResponse =
@@ -114,6 +139,9 @@ class WorkerSyncService {
     return WorkerSyncPayload(
       profile: _mapProfile(profileMap, memberships, employeeData, shiftsRaw),
       companyPlan: companyPlan,
+      enabledLanguages: enabledLanguages,
+      defaultLanguage:
+          enabledLanguages.contains(defaultLanguage) ? defaultLanguage : 'en',
       shifts: shiftsRaw
           .whereType<Map>()
           .map((raw) => _mapShift(raw, membershipId))
@@ -121,6 +149,8 @@ class WorkerSyncService {
           .toList(),
       activities: activityRaw.whereType<Map>().map(_mapActivity).toList(),
       messages: messagesRaw.whereType<Map>().map(_mapMessage).toList(),
+      staffContacts:
+          contactsRaw.whereType<Map>().map(_mapStaffContact).toList(),
       absenceRequests:
           absenceRaw.whereType<Map>().map(_mapAbsenceRequest).toList(),
       timeEntries: timeEntryRaw.whereType<Map>().map(_mapTimeEntry).toList(),
@@ -140,6 +170,36 @@ class WorkerSyncService {
     );
   }
 
+  Future<void> updatePreferredLanguage(String languageCode) async {
+    final companyId = _authService.companyId;
+    final membershipId = _authService.membershipId;
+    if (companyId == null || membershipId == null) {
+      throw StateError('Missing company or membership context.');
+    }
+    await _apiService.client.patch(
+      '/api/v1/companies/$companyId/employees/$membershipId',
+      data: {'preferred_language': languageCode},
+    );
+  }
+
+  Future<DateTime> confirmShiftWork(String shiftId) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    final response = await _apiService.client.post<Map<String, dynamic>>(
+      '/api/v1/companies/$companyId/shifts/$shiftId/confirm-work',
+    );
+    final raw = (response.data?['data'] as Map?)?['shift'] as Map?;
+    final confirmedAt =
+        DateTime.tryParse((raw?['work_confirmed_at'] as String?) ?? '');
+    if (confirmedAt == null) {
+      throw StateError('Missing shift confirmation response.');
+    }
+    return confirmedAt;
+  }
+
   Future<void> markMessageAsRead(String messageId) async {
     final companyId = _authService.companyId;
     if (companyId == null) {
@@ -148,6 +208,18 @@ class WorkerSyncService {
 
     await _apiService.client.patch(
       '/api/v1/companies/$companyId/messages/$messageId/read',
+    );
+  }
+
+  Future<void> setMessageReaction(String messageId, String? emoji) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    await _apiService.client.put(
+      '/api/v1/companies/$companyId/messages/$messageId/reaction',
+      data: {'emoji': emoji},
     );
   }
 
@@ -218,45 +290,6 @@ class WorkerSyncService {
     return _mapAbsenceRequest(raw);
   }
 
-  Future<TimeEntry> clockIn({String? shiftId}) async {
-    final companyId = _authService.companyId;
-    if (companyId == null) {
-      throw StateError('Missing company context.');
-    }
-
-    final response = await _apiService.client.post<Map<String, dynamic>>(
-      '/api/v1/companies/$companyId/time-entries/clock-in',
-      data: {
-        if (shiftId != null && shiftId.trim().isNotEmpty) 'shiftId': shiftId,
-      },
-    );
-    final raw = (response.data?['data'] as Map?)?['entry'] as Map?;
-    if (raw == null) throw StateError('Missing time entry response.');
-    return _mapTimeEntry(raw);
-  }
-
-  Future<TimeEntry> clockOut({
-    required String entryId,
-    int breakMinutes = 0,
-    String notes = '',
-  }) async {
-    final companyId = _authService.companyId;
-    if (companyId == null) {
-      throw StateError('Missing company context.');
-    }
-
-    final response = await _apiService.client.patch<Map<String, dynamic>>(
-      '/api/v1/companies/$companyId/time-entries/$entryId/clock-out',
-      data: {
-        'breakMinutes': breakMinutes,
-        'notes': notes,
-      },
-    );
-    final raw = (response.data?['data'] as Map?)?['entry'] as Map?;
-    if (raw == null) throw StateError('Missing time entry response.');
-    return _mapTimeEntry(raw);
-  }
-
   EmployeeProfile _mapProfile(
     Map profile,
     List memberships,
@@ -292,6 +325,9 @@ class WorkerSyncService {
           : membershipJobTitle,
       companyRole: role,
       profilePhotoUrl: membershipPhoto,
+      preferredLanguage: (employee['preferred_language'] ??
+          profile['preferred_language'] ??
+          'en') as String,
     );
   }
 
@@ -353,6 +389,17 @@ class WorkerSyncService {
         _ => ShiftStatus.changed,
       },
       notes: (raw['notes'] as String?)?.trim() ?? '',
+      workConfirmationRequired:
+          raw['work_confirmation_required'] as bool? ?? false,
+      workConfirmationStatus: WorkConfirmationStatus.values.firstWhere(
+        (status) => status.name == raw['work_confirmation_status'],
+        orElse: () => WorkConfirmationStatus.pending,
+      ),
+      workConfirmationSource: raw['work_confirmation_source'] as String?,
+      workConfirmationReason: raw['work_confirmation_reason'] as String?,
+      workConfirmedAt:
+          DateTime.tryParse((raw['work_confirmed_at'] as String?) ?? ''),
+      workConfirmedByMemberId: raw['work_confirmed_by_member_id'] as String?,
     );
   }
 
@@ -414,6 +461,22 @@ class WorkerSyncService {
 
   AppMessage _mapMessage(Map raw) {
     return AppMessage.fromJson(raw);
+  }
+
+  StaffContact _mapStaffContact(Map raw) {
+    final firstName = (raw['first_name'] as String?) ?? '';
+    final lastName = (raw['last_name'] as String?) ?? '';
+    final email = (raw['email'] as String?) ?? '';
+    final name = '$firstName $lastName'.trim();
+    return StaffContact(
+      id: (raw['id'] as String?) ?? '',
+      name: name.isNotEmpty ? name : email,
+      role: (raw['role'] as String?) ?? '',
+      jobTitle: (raw['job_title'] as String?) ?? '',
+      email: email,
+      phone: (raw['phone'] as String?) ?? '',
+      profilePhotoUrl: (raw['profile_photo_url'] as String?) ?? '',
+    );
   }
 
   String _toTitle(String value) {

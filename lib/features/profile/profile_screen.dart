@@ -8,7 +8,6 @@ import '../../core/constants/app_typography.dart';
 import '../../core/models/absence_request.dart';
 import '../../core/models/employee_profile.dart';
 import '../../core/models/shift.dart';
-import '../../core/models/time_entry.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
@@ -18,6 +17,7 @@ import '../../core/widgets/offline_cache_banner.dart';
 import '../../core/widgets/segmented_tabs.dart';
 import '../../core/widgets/shift_list_item.dart';
 import '../hours/hours_screen.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -31,6 +31,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 720.0 : double.infinity;
 
@@ -38,7 +39,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: Column(
         children: [
           AppHeader(
-            title: 'My Work',
+            title: l10n.loginTitle,
             onLeadingPressed: () => context.go('/profile/edit'),
             trailingIcon: Icons.logout_rounded,
             onTrailingPressed: () async {
@@ -54,7 +55,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   padding: const EdgeInsets.all(AppSpacing.md),
                   children: [
                     SegmentedTabs(
-                      tabs: const ['Shifts', 'Absence', 'Hours', 'Information'],
+                      tabs: [
+                        l10n.shifts,
+                        l10n.absence,
+                        l10n.hours,
+                        l10n.information,
+                      ],
                       selectedIndex: _selectedTab,
                       onChanged: (index) =>
                           setState(() => _selectedTab = index),
@@ -90,32 +96,53 @@ class _DashboardPassTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final nextShift = ref.watch(nextShiftProvider);
     final now = DateTime.now();
     final shifts = ref.watch(shiftsProvider);
     final availableShifts = shifts
         .where((shift) =>
-            shift.status == ShiftStatus.available &&
-            !shift.endsAt.isBefore(now))
+            shift.status == ShiftStatus.available && !shift.hasEnded(now))
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final upcomingShifts = shifts
         .where((shift) =>
-            shift.status != ShiftStatus.available &&
-            !shift.endsAt.isBefore(now))
+            shift.status != ShiftStatus.available && !shift.hasEnded(now))
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final profile = ref.watch(employeeProfileProvider);
+    final companyPlan = ref.watch(companyPlanProvider).toLowerCase();
+    final canConfirmWorkedShifts =
+        companyPlan == 'pro' || companyPlan == 'enterprise';
+    final shiftsToConfirm = canConfirmWorkedShifts
+        ? shifts.where((shift) => shift.canConfirmWork(now)).toList()
+        : <Shift>[]
+      ..sort((a, b) => b.endsAt.compareTo(a.endsAt));
+    final recentlyConfirmedShifts = canConfirmWorkedShifts
+        ? shifts
+            .where(
+              (shift) =>
+                  shift.isWorkConfirmed &&
+                  shift.workConfirmedAt != null &&
+                  shift.workConfirmedAt!.isAfter(
+                    now.subtract(const Duration(days: 7)),
+                  ),
+            )
+            .toList()
+        : <Shift>[]
+      ..sort(
+        (a, b) => b.workConfirmedAt!.compareTo(a.workConfirmedAt!),
+      );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Next shift', style: AppTypography.headingMedium),
+        Text(l10n.nextShift, style: AppTypography.headingMedium),
         const SizedBox(height: AppSpacing.sm),
         if (nextShift == null)
           DashboardCard(
             child: Text(
-              'No upcoming shifts yet',
+              l10n.noUpcomingShifts,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.mutedText,
               ),
@@ -127,15 +154,23 @@ class _DashboardPassTab extends StatelessWidget {
             profile: profile,
             onTap: () => _showShiftDetails(context, nextShift),
           ),
+        if (shiftsToConfirm.isNotEmpty ||
+            recentlyConfirmedShifts.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.md),
+          _ShiftConfirmationCard(
+            pendingShifts: shiftsToConfirm,
+            confirmedShifts: recentlyConfirmedShifts,
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         _ShiftListCard(
-          title: 'Available shifts',
+          title: l10n.availableShifts,
           shifts: availableShifts,
           accentColor: AppColors.primaryGreen,
         ),
         const SizedBox(height: AppSpacing.md),
         _ShiftListCard(
-          title: 'Upcoming shifts',
+          title: l10n.upcomingShifts,
           shifts: upcomingShifts,
           accentColor: AppColors.orangeHours,
         ),
@@ -144,11 +179,6 @@ class _DashboardPassTab extends StatelessWidget {
   }
 
   void _showShiftDetails(BuildContext context, Shift shift) {
-    final timeEntries = ref.read(timeEntriesProvider);
-    final openEntry = timeEntries.where((entry) => entry.isOpen).firstOrNull;
-    final companyPlan = ref.read(companyPlanProvider).toLowerCase();
-    final canUseTimeClock = companyPlan == 'pro' || companyPlan == 'enterprise';
-
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -159,17 +189,192 @@ class _DashboardPassTab extends StatelessWidget {
       ),
       builder: (context) => _ProfileShiftDetailSheet(
         shift: shift,
-        openEntry: openEntry,
-        canUseTimeClock: canUseTimeClock,
-        onClockIn: () =>
-            ref.read(timeEntriesProvider.notifier).clockIn(shiftId: shift.id),
-        onClockOut: openEntry == null
-            ? null
-            : () => ref
-                .read(timeEntriesProvider.notifier)
-                .clockOut(entryId: openEntry.id),
       ),
     );
+  }
+}
+
+class _ShiftConfirmationCard extends ConsumerStatefulWidget {
+  const _ShiftConfirmationCard({
+    required this.pendingShifts,
+    required this.confirmedShifts,
+  });
+
+  final List<Shift> pendingShifts;
+  final List<Shift> confirmedShifts;
+
+  @override
+  ConsumerState<_ShiftConfirmationCard> createState() =>
+      _ShiftConfirmationCardState();
+}
+
+class _ShiftConfirmationCardState
+    extends ConsumerState<_ShiftConfirmationCard> {
+  String? _confirmingShiftId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.fact_check_outlined,
+                color: AppColors.primaryGreen,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  l10n.shiftConfirmations,
+                  style: AppTypography.headingMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            l10n.confirmWithinSevenDays,
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.mutedText,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final shift in widget.pendingShifts) ...[
+            if (shift != widget.pendingShifts.first) const Divider(),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        shift.role,
+                        style: AppTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '${_formatShiftDate(shift.startsAt)} · '
+                        '${_formatTime(shift.startsAt)} - ${_formatTime(shift.endsAt)}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton.icon(
+                  onPressed: _confirmingShiftId == null
+                      ? () => _confirmShift(shift)
+                      : null,
+                  icon: _confirmingShiftId == shift.id
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded),
+                  label: Text(
+                    _confirmingShiftId == shift.id
+                        ? l10n.confirming
+                        : l10n.confirmWorked,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          for (final shift in widget.confirmedShifts) ...[
+            if (widget.pendingShifts.isNotEmpty ||
+                shift != widget.confirmedShifts.first)
+              const Divider(),
+            Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.primaryGreen,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        shift.role,
+                        style: AppTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        l10n.confirmedOn(
+                          _formatConfirmationDate(shift.workConfirmedAt!),
+                        ),
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmShift(Shift shift) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.confirmWorkedQuestion),
+        content: Text(
+          '${shift.role}\n'
+          '${_formatShiftDate(shift.startsAt)}, '
+          '${_formatTime(shift.startsAt)} - ${_formatTime(shift.endsAt)}\n\n'
+          '${l10n.confirmAttestation}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.check_rounded),
+            label: Text(l10n.confirmWorked),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _confirmingShiftId = shift.id);
+    try {
+      await ref.read(shiftsProvider.notifier).confirmShiftWorked(shift.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.shiftConfirmedAsWorked)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.shiftConfirmationFailed),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _confirmingShiftId = null);
+    }
   }
 }
 
@@ -247,17 +452,9 @@ class _NextShiftCard extends StatelessWidget {
 class _ProfileShiftDetailSheet extends StatefulWidget {
   const _ProfileShiftDetailSheet({
     required this.shift,
-    required this.openEntry,
-    required this.canUseTimeClock,
-    required this.onClockIn,
-    required this.onClockOut,
   });
 
   final Shift shift;
-  final TimeEntry? openEntry;
-  final bool canUseTimeClock;
-  final Future<void> Function() onClockIn;
-  final Future<void> Function()? onClockOut;
 
   @override
   State<_ProfileShiftDetailSheet> createState() =>
@@ -265,12 +462,9 @@ class _ProfileShiftDetailSheet extends StatefulWidget {
 }
 
 class _ProfileShiftDetailSheetState extends State<_ProfileShiftDetailSheet> {
-  bool _clockLoading = false;
-
   @override
   Widget build(BuildContext context) {
     final note = widget.shift.notes.trim();
-    final isClockedIn = widget.openEntry != null;
     return SafeArea(
       top: false,
       child: Padding(
@@ -334,98 +528,10 @@ class _ProfileShiftDetailSheetState extends State<_ProfileShiftDetailSheet> {
               icon: Icons.notes_outlined,
               text: note.isEmpty ? 'No manager note for this shift.' : note,
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: widget.canUseTimeClock
-                    ? AppColors.background
-                    : AppColors.greenSoft,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.line),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.canUseTimeClock
-                        ? (isClockedIn
-                            ? Icons.timer_rounded
-                            : Icons.login_rounded)
-                        : Icons.lock_outline_rounded,
-                    color: widget.canUseTimeClock
-                        ? (isClockedIn
-                            ? AppColors.primaryGreen
-                            : AppColors.blueInfo)
-                        : AppColors.mutedText,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      widget.canUseTimeClock
-                          ? (isClockedIn
-                              ? 'Clocked in at ${_formatTime(widget.openEntry!.clockInAt)}'
-                              : 'Clock in for this shift')
-                          : 'Clock in/out is available on Pro and Enterprise.',
-                      style: AppTypography.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  FilledButton(
-                    onPressed: _clockLoading || !widget.canUseTimeClock
-                        ? null
-                        : _handleClockAction,
-                    child: _clockLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(widget.canUseTimeClock
-                            ? (isClockedIn ? 'Clock out' : 'Clock in')
-                            : 'Pro'),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _handleClockAction() async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _clockLoading = true);
-    try {
-      if (widget.openEntry == null) {
-        await widget.onClockIn();
-      } else {
-        await widget.onClockOut?.call();
-      }
-      if (!mounted) return;
-      navigator.pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content:
-              Text(widget.openEntry == null ? 'Clocked in.' : 'Clocked out.'),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _clockLoading = false);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(widget.openEntry == null
-              ? 'Could not clock in. Try again.'
-              : 'Could not clock out. Try again.'),
-        ),
-      );
-    }
   }
 }
 
@@ -927,6 +1033,11 @@ String _formatTime(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+String _formatConfirmationDate(DateTime date) {
+  final local = date.toLocal();
+  return '${local.day} ${_monthShort(local)} at ${_formatTime(local)}';
 }
 
 String _formatShortDate(DateTime date) {

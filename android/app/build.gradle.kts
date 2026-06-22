@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.shaqonet.employee"
+    namespace = "com.taggnet.shaqonet.employee"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.shaqonet.employee"
+        applicationId = "com.taggnet.shaqonet.employee"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

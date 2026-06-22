@@ -10,6 +10,7 @@ import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -19,6 +20,8 @@ class AccountScreen extends ConsumerWidget {
     final profile = ref.watch(employeeProfileProvider);
     final companyName = ref.watch(companyNameProvider);
     final languageCode = ref.watch(languageCodeProvider);
+    final enabledLanguages = ref.watch(enabledLanguagesProvider);
+    final l10n = AppLocalizations.of(context);
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 720.0 : double.infinity;
 
@@ -26,7 +29,7 @@ class AccountScreen extends ConsumerWidget {
       body: Column(
         children: [
           AppHeader(
-            title: 'Profile',
+            title: l10n.profile,
             leadingIcon: Icons.edit_outlined,
             onLeadingPressed: () => context.go('/profile/edit'),
             trailingIcon: Icons.logout_rounded,
@@ -51,16 +54,17 @@ class AccountScreen extends ConsumerWidget {
                             backgroundColor: AppColors.greenSoft,
                             backgroundImage:
                                 profilePhotoProvider(profile.profilePhotoUrl),
-                            child: profilePhotoProvider(profile.profilePhotoUrl) !=
-                                    null
-                                ? null
-                                : Text(
-                                    profile.initials,
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
+                            child:
+                                profilePhotoProvider(profile.profilePhotoUrl) !=
+                                        null
+                                    ? null
+                                    : Text(
+                                        profile.initials,
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           Text(profile.fullName,
@@ -80,87 +84,101 @@ class AccountScreen extends ConsumerWidget {
                         children: [
                           _ProfileInfoRow(
                             icon: Icons.mail_outline_rounded,
-                            label: 'Email',
+                            label: l10n.email,
                             value: profile.email,
                           ),
                           const Divider(height: AppSpacing.lg),
                           _ProfileInfoRow(
                             icon: Icons.badge_outlined,
-                            label: 'Role',
+                            label: l10n.role,
                             value: profile.companyRoleLabel,
                           ),
                           const Divider(height: AppSpacing.lg),
                           _ProfileInfoRow(
                             icon: Icons.phone_outlined,
-                            label: 'Phone',
+                            label: l10n.phone,
                             value: profile.phoneNumber.isEmpty
-                                ? 'Not provided'
+                                ? l10n.notProvided
                                 : profile.phoneNumber,
                           ),
                           const Divider(height: AppSpacing.lg),
                           _ProfileInfoRow(
                             icon: Icons.business_outlined,
-                            label: 'Company',
+                            label: l10n.company,
                             value: companyName,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    DashboardCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Preferences',
-                              style: AppTypography.headingMedium),
-                          const SizedBox(height: AppSpacing.md),
-                          Row(
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: AppColors.greenSoft,
-                                  borderRadius: BorderRadius.circular(14),
+                    if (enabledLanguages.length > 1) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      DashboardCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l10n.preferences,
+                                style: AppTypography.headingMedium),
+                            const SizedBox(height: AppSpacing.md),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.greenSoft,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const Icon(
+                                    Icons.language_rounded,
+                                    color: AppColors.primaryGreen,
+                                    size: 20,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.language_rounded,
-                                  color: AppColors.primaryGreen,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: SegmentedButton<String>(
-                                  segments: const [
-                                    ButtonSegment(
-                                      value: 'en',
-                                      label: Text('English'),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    initialValue:
+                                        enabledLanguages.contains(languageCode)
+                                            ? languageCode
+                                            : 'en',
+                                    decoration: InputDecoration(
+                                      labelText: l10n.appLanguage,
                                     ),
-                                    ButtonSegment(
-                                      value: 'so',
-                                      label: Text('Somali'),
-                                    ),
-                                  ],
-                                  selected: {languageCode},
-                                  onSelectionChanged: (selected) {
-                                    ref
-                                        .read(languageCodeProvider.notifier)
-                                        .setLanguage(selected.first);
-                                  },
+                                    items: enabledLanguages
+                                        .map(
+                                          (code) => DropdownMenuItem(
+                                            value: code,
+                                            child: Text(
+                                              code == 'en'
+                                                  ? l10n.englishName
+                                                  : code == 'so'
+                                                      ? l10n.somaliName
+                                                      : l10n.swahiliName,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (selected) {
+                                      if (selected == null) return;
+                                      ref
+                                          .read(languageCodeProvider.notifier)
+                                          .setLanguage(selected);
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: AppSpacing.md),
                     DashboardCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Documents', style: AppTypography.headingMedium),
+                          Text(l10n.documents,
+                              style: AppTypography.headingMedium),
                           const SizedBox(height: AppSpacing.sm),
                           Row(
                             children: [
@@ -180,7 +198,7 @@ class AccountScreen extends ConsumerWidget {
                               const SizedBox(width: AppSpacing.md),
                               Expanded(
                                 child: Text(
-                                  'Employment documents are managed by your workplace.',
+                                  l10n.employmentDocumentsManaged,
                                   style: AppTypography.bodyMedium.copyWith(
                                     color: AppColors.mutedText,
                                   ),

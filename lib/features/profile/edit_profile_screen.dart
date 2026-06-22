@@ -193,8 +193,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           CircleAvatar(
                             radius: 44,
                             backgroundColor: AppColors.greenSoft,
-                            backgroundImage:
-                                profilePhotoProvider(previewProfile.profilePhotoUrl),
+                            backgroundImage: profilePhotoProvider(
+                                previewProfile.profilePhotoUrl),
                             child: profilePhotoProvider(
                                         previewProfile.profilePhotoUrl) !=
                                     null
@@ -202,7 +202,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 : Text(
                                     previewProfile.initials,
                                     style: const TextStyle(
-                                        fontSize: 24, fontWeight: FontWeight.w900),
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w900),
                                   ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
@@ -311,7 +312,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: FilledButton(
-                      onPressed: (_isFormValid && !_isLoading) ? _saveProfile : null,
+                      onPressed:
+                          (_isFormValid && !_isLoading) ? _saveProfile : null,
                       child: _isLoading
                           ? const SizedBox(
                               width: 20,

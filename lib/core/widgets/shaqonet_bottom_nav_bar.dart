@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
 import '../providers/service_providers.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class ShaqoNetBottomNavBar extends ConsumerWidget {
   const ShaqoNetBottomNavBar({
@@ -19,7 +20,7 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final labels = _NavLabels.forLanguage(ref.watch(languageCodeProvider));
+    final labels = AppLocalizations.of(context);
     final isEnterpriseHub =
         ref.watch(companyPlanProvider).toLowerCase() == 'enterprise';
 
@@ -58,7 +59,9 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
             unreadCount: unreadMessageCount,
           ),
           selectedIcon: _NavIconWithBadge(
-            icon: isEnterpriseHub ? Icons.forum_rounded : Icons.chat_bubble_rounded,
+            icon: isEnterpriseHub
+                ? Icons.forum_rounded
+                : Icons.chat_bubble_rounded,
             unreadCount: unreadMessageCount,
           ),
           label: isEnterpriseHub ? labels.hub : labels.messages,
@@ -69,46 +72,6 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
           label: labels.profile,
         ),
       ],
-    );
-  }
-}
-
-class _NavLabels {
-  const _NavLabels({
-    required this.home,
-    required this.schedule,
-    required this.activity,
-    required this.messages,
-    required this.hub,
-    required this.profile,
-  });
-
-  final String home;
-  final String schedule;
-  final String activity;
-  final String messages;
-  final String hub;
-  final String profile;
-
-  factory _NavLabels.forLanguage(String languageCode) {
-    if (languageCode == 'so') {
-      return const _NavLabels(
-        home: 'Hoy',
-        schedule: 'Jadwal',
-        activity: 'Hawlaha',
-        messages: 'Farriimaha',
-        hub: 'Hub',
-        profile: 'Profile',
-      );
-    }
-
-    return const _NavLabels(
-      home: 'Home',
-      schedule: 'Schedule',
-      activity: 'Activity',
-      messages: 'Messages',
-      hub: 'Hub',
-      profile: 'Profile',
     );
   }
 }

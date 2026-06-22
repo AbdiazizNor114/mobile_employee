@@ -5,10 +5,12 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/models/shift.dart';
 import '../../core/providers/mock_work_provider.dart';
+import '../../core/providers/service_providers.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
 import '../../core/widgets/stat_card.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class HoursScreen extends ConsumerStatefulWidget {
   const HoursScreen({super.key, this.showHeader = true});
@@ -34,6 +36,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final shifts = ref.watch(shiftsProvider);
     final workedDays = _workedDaysFromShifts(shifts);
     final visibleDays = workedDays.where((day) {
@@ -52,11 +55,24 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
       start: _selectedRange.start,
       end: _selectedRange.end,
     );
+    final companyPlan = ref.watch(companyPlanProvider).toLowerCase();
+    final hasShiftConfirmation =
+        companyPlan == 'pro' || companyPlan == 'enterprise';
+    final now = DateTime.now();
+    final pendingConfirmations = hasShiftConfirmation
+        ? shifts.where((shift) => shift.canConfirmWork(now)).length
+        : 0;
+    final overdueConfirmations = hasShiftConfirmation
+        ? shifts.where((shift) => shift.isWorkConfirmationOverdue(now)).length
+        : 0;
     final aiInsight = _buildAiInsight(
+      l10n: l10n,
       scheduledHours: totalHours,
       completedHours: completedHours,
       breakHours: breakHours,
       workDays: workDays,
+      pendingConfirmations: pendingConfirmations,
+      overdueConfirmations: overdueConfirmations,
     );
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 720.0 : double.infinity;
@@ -76,7 +92,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Date range', style: AppTypography.headingMedium),
+                  Text(l10n.dateRange, style: AppTypography.headingMedium),
                   const SizedBox(height: AppSpacing.sm),
                   Row(
                     children: [
@@ -91,7 +107,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                       FilledButton.icon(
                         onPressed: _pickDateRange,
                         icon: const Icon(Icons.calendar_month_outlined),
-                        label: const Text('Change'),
+                        label: Text(l10n.change),
                       ),
                     ],
                   ),
@@ -101,15 +117,15 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                     runSpacing: AppSpacing.sm,
                     children: [
                       ActionChip(
-                        label: const Text('This week'),
+                        label: Text(l10n.thisWeek),
                         onPressed: _selectThisWeek,
                       ),
                       ActionChip(
-                        label: const Text('This month'),
+                        label: Text(l10n.thisMonth),
                         onPressed: _selectThisMonth,
                       ),
                       ActionChip(
-                        label: const Text('Last 7 days'),
+                        label: Text(l10n.lastSevenDays),
                         onPressed: _selectLastSevenDays,
                       ),
                     ],
@@ -122,7 +138,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               children: [
                 Expanded(
                   child: StatCard(
-                    label: 'Total shift hours',
+                    label: l10n.totalShiftHours,
                     value: _formatHours(totalHours),
                     accentColor: AppColors.orangeHours,
                     icon: Icons.schedule,
@@ -131,7 +147,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: StatCard(
-                    label: 'Work days',
+                    label: l10n.workDays,
                     value: '$workDays',
                     accentColor: AppColors.purpleWorkdays,
                     icon: Icons.work_outline,
@@ -144,7 +160,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               children: [
                 Expanded(
                   child: StatCard(
-                    label: 'Break time',
+                    label: l10n.breakTime,
                     value: '${_formatHours(breakHours)} h',
                     accentColor: AppColors.primaryGreen,
                     icon: Icons.coffee_outlined,
@@ -153,7 +169,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: StatCard(
-                    label: 'Avg shift length',
+                    label: l10n.averageShiftLength,
                     value: workDays == 0
                         ? '0'
                         : _formatHours(totalHours / workDays),
@@ -168,7 +184,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Time balance', style: AppTypography.headingMedium),
+                  Text(l10n.timeBalance, style: AppTypography.headingMedium),
                   const SizedBox(height: AppSpacing.sm),
                   LinearProgressIndicator(
                     value: (totalHours / 40).clamp(0.0, 1.0),
@@ -179,9 +195,12 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    aiInsight,
+                    aiInsight.message,
                     style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.mutedText,
+                      color: aiInsight.color,
+                      fontWeight: aiInsight.isActionRequired
+                          ? FontWeight.w800
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -192,11 +211,11 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Booked days', style: AppTypography.headingMedium),
+                  Text(l10n.bookedDays, style: AppTypography.headingMedium),
                   const SizedBox(height: AppSpacing.sm),
                   if (visibleDays.isEmpty)
                     Text(
-                      'No booked shifts in this range',
+                      l10n.noBookedShifts,
                       style: AppTypography.bodyMedium.copyWith(
                         color: AppColors.mutedText,
                       ),
@@ -227,7 +246,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
     return Scaffold(
       body: Column(
         children: [
-          const AppHeader(title: 'Hours / Time report', leadingIcon: null),
+          AppHeader(title: l10n.timeReport, leadingIcon: null),
           Expanded(child: content),
         ],
       ),
@@ -241,8 +260,8 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
       initialDateRange: _selectedRange,
       firstDate: DateTime(today.year, today.month - 3),
       lastDate: DateTime(today.year, today.month + 3),
-      helpText: 'Choose worked days',
-      saveText: 'Apply',
+      helpText: AppLocalizations.of(context).chooseWorkedDays,
+      saveText: AppLocalizations.of(context).apply,
     );
 
     if (range == null) return;
@@ -333,24 +352,69 @@ double _completedShiftHoursInRange({
   }).fold<double>(0, (sum, shift) => sum + _shiftDurationHours(shift));
 }
 
-String _buildAiInsight({
+_AiInsight _buildAiInsight({
+  required AppLocalizations l10n,
   required double scheduledHours,
   required double completedHours,
   required double breakHours,
   required int workDays,
+  required int pendingConfirmations,
+  required int overdueConfirmations,
 }) {
+  if (overdueConfirmations > 0) {
+    return _AiInsight(
+      l10n.aiOverdueConfirmations(overdueConfirmations),
+      AppColors.alertRed,
+      isActionRequired: true,
+    );
+  }
+  if (pendingConfirmations > 0) {
+    return _AiInsight(
+      l10n.aiPendingConfirmations(pendingConfirmations),
+      AppColors.orangeHours,
+      isActionRequired: true,
+    );
+  }
   if (workDays == 0) {
-    return 'AI insight: No assigned shifts in this range yet. Add a shift or widen the date range.';
+    return _AiInsight(
+      l10n.aiNoAssignedShifts,
+      AppColors.mutedText,
+    );
   }
   if (completedHours == 0 && scheduledHours > 0) {
-    return 'AI insight: You have ${_formatHours(scheduledHours)} scheduled hours in this range, but none completed yet.';
+    return _AiInsight(
+      l10n.aiScheduledNoneCompleted(_formatHours(scheduledHours)),
+      AppColors.mutedText,
+    );
   }
   if (scheduledHours == completedHours) {
-    return 'AI insight: Great consistency. All scheduled hours in this range are completed.';
+    return _AiInsight(
+      l10n.aiAllHoursCompleted,
+      AppColors.mutedText,
+    );
   }
   final remaining =
       (scheduledHours - completedHours).clamp(0, scheduledHours).toDouble();
-  return 'AI insight: ${_formatHours(completedHours)}h completed, ${_formatHours(remaining)}h remaining, with ${_formatHours(breakHours)}h break time scheduled.';
+  return _AiInsight(
+    l10n.aiHoursProgress(
+      _formatHours(completedHours),
+      _formatHours(remaining),
+      _formatHours(breakHours),
+    ),
+    AppColors.mutedText,
+  );
+}
+
+class _AiInsight {
+  const _AiInsight(
+    this.message,
+    this.color, {
+    this.isActionRequired = false,
+  });
+
+  final String message;
+  final Color color;
+  final bool isActionRequired;
 }
 
 double _shiftDurationHours(Shift shift) {

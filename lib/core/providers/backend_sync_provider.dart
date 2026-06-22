@@ -15,12 +15,28 @@ final backendSyncProvider = FutureProvider<void>((ref) async {
     ref.read(shiftsProvider.notifier).replaceAll(payload.shifts);
     ref.read(activityProvider.notifier).replaceAll(payload.activities);
     ref.read(messagesProvider.notifier).replaceAll(payload.messages);
+    ref.read(staffContactsProvider.notifier).replaceAll(payload.staffContacts);
     ref
         .read(absenceRequestsProvider.notifier)
         .replaceAll(payload.absenceRequests);
     ref.read(timeEntriesProvider.notifier).replaceAll(payload.timeEntries);
     await ref.read(storageServiceProvider).saveCompanyPlan(payload.companyPlan);
     ref.read(companyPlanProvider.notifier).state = payload.companyPlan;
+    await ref
+        .read(storageServiceProvider)
+        .saveEnabledLanguages(payload.enabledLanguages);
+    ref.read(enabledLanguagesProvider.notifier).state =
+        payload.enabledLanguages;
+    final preferredLanguage = payload.enabledLanguages.contains(
+      payload.profile.preferredLanguage,
+    )
+        ? payload.profile.preferredLanguage
+        : payload.defaultLanguage;
+    if (ref.read(languageCodeProvider) != preferredLanguage) {
+      await ref
+          .read(languageCodeProvider.notifier)
+          .setLanguage(preferredLanguage);
+    }
     ref.read(lastSyncErrorProvider.notifier).state = null;
   } on StateError catch (_) {
     // Missing IDs, likely signing out

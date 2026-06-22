@@ -12,6 +12,7 @@ import '../../core/widgets/activity_list_item.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/offline_cache_banner.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class ActivityScreen extends ConsumerStatefulWidget {
   const ActivityScreen({super.key});
@@ -42,6 +43,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final activity = ref.watch(activityProvider);
     final unreadCount = ref.watch(unreadActivityCountProvider);
     final contentMaxWidth =
@@ -50,73 +52,73 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     return Scaffold(
       body: Column(
         children: [
-          const AppHeader(title: 'Activities', leadingIcon: null),
+          AppHeader(title: l10n.activities, leadingIcon: null),
           Expanded(
             child: RefreshIndicator(
-          onRefresh: () => ref.refresh(backendSyncProvider.future),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: contentMaxWidth),
-              child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                children: [
-                  const OfflineCacheBanner(),
-                  const SizedBox(height: AppSpacing.md),
-                  DashboardCard(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '$unreadCount unread',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: unreadCount == 0
-                              ? null
-                              : () => ref
-                                  .read(activityProvider.notifier)
-                                  .markAllRead(),
-                          child: const Text('Mark all read'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  DashboardCard(
-                    child: Column(
-                      children: [
-                        if (activity.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.all(AppSpacing.xl),
-                            child: Text(
-                              'No activity yet.',
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: AppColors.mutedText,
+              onRefresh: () => ref.refresh(backendSyncProvider.future),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    children: [
+                      const OfflineCacheBanner(),
+                      const SizedBox(height: AppSpacing.md),
+                      DashboardCard(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.unreadCount(unreadCount),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
-                          )
-                        else
-                          for (final item in activity)
-                            ActivityListItem(
-                              icon: _iconFor(item.type),
-                              iconColor: _colorFor(item.type),
-                              title: item.title,
-                              subtitle: item.detail,
-                              time: _timeFor(item.createdAt),
-                              isUnread: item.isUnread,
+                            TextButton(
+                              onPressed: unreadCount == 0
+                                  ? null
+                                  : () => ref
+                                      .read(activityProvider.notifier)
+                                      .markAllRead(),
+                              child: Text(l10n.markAllRead),
                             ),
-                      ],
-                    ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      DashboardCard(
+                        child: Column(
+                          children: [
+                            if (activity.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(AppSpacing.xl),
+                                child: Text(
+                                  l10n.noActivityYet,
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.mutedText,
+                                  ),
+                                ),
+                              )
+                            else
+                              for (final item in activity)
+                                ActivityListItem(
+                                  icon: _iconFor(item.type),
+                                  iconColor: _colorFor(item.type),
+                                  title: item.title,
+                                  subtitle: item.detail,
+                                  time: _timeFor(item.createdAt, l10n),
+                                  isUnread: item.isUnread,
+                                ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
           ),
         ],
       ),
@@ -141,12 +143,14 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     };
   }
 
-  String _timeFor(DateTime createdAt) {
+  String _timeFor(DateTime createdAt, AppLocalizations l10n) {
     final now = DateTime.now();
     final difference = now.difference(createdAt);
-    if (difference.inMinutes < 1) return 'Just now';
-    if (difference.inMinutes < 60) return '${difference.inMinutes} min ago';
-    if (difference.inHours < 24) return '${difference.inHours} h ago';
-    return '${difference.inDays} d ago';
+    if (difference.inMinutes < 1) return l10n.justNow;
+    if (difference.inMinutes < 60) {
+      return l10n.minutesAgo(difference.inMinutes);
+    }
+    if (difference.inHours < 24) return l10n.hoursAgo(difference.inHours);
+    return l10n.daysAgo(difference.inDays);
   }
 }

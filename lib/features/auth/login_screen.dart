@@ -64,7 +64,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (error is DioException) {
         final status = error.response?.statusCode;
         final data = error.response?.data;
-        if (status != null) {
+        if (error.type == DioExceptionType.connectionError ||
+            error.type == DioExceptionType.connectionTimeout ||
+            error.type == DioExceptionType.receiveTimeout) {
+          message = 'Could not reach the ShaqoNet server. Please try again.';
+        } else if (status != null) {
           message = 'Sign-in failed ($status). Please try again.';
         }
         if (data is Map && data['error'] is String) {

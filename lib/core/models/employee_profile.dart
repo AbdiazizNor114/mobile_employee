@@ -9,6 +9,7 @@ class EmployeeProfile {
     this.jobTitle = '',
     this.companyRole = '',
     this.profilePhotoUrl = '',
+    this.preferredLanguage = 'en',
   });
 
   final String firstName;
@@ -20,6 +21,7 @@ class EmployeeProfile {
   final String jobTitle;
   final String companyRole;
   final String profilePhotoUrl;
+  final String preferredLanguage;
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -58,6 +60,7 @@ class EmployeeProfile {
     String? jobTitle,
     String? companyRole,
     String? profilePhotoUrl,
+    String? preferredLanguage,
   }) {
     return EmployeeProfile(
       firstName: firstName ?? this.firstName,
@@ -69,6 +72,7 @@ class EmployeeProfile {
       jobTitle: jobTitle ?? this.jobTitle,
       companyRole: companyRole ?? this.companyRole,
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
     );
   }
 
@@ -83,6 +87,7 @@ class EmployeeProfile {
       'jobTitle': jobTitle,
       'companyRole': companyRole,
       'profilePhotoUrl': profilePhotoUrl,
+      'preferredLanguage': preferredLanguage,
     };
   }
 
@@ -96,6 +101,63 @@ class EmployeeProfile {
       isTeamLead: json['isTeamLead'] as bool? ?? false,
       jobTitle: json['jobTitle'] as String? ?? '',
       companyRole: json['companyRole'] as String? ?? '',
+      profilePhotoUrl: json['profilePhotoUrl'] as String? ?? '',
+      preferredLanguage: json['preferredLanguage'] as String? ?? 'en',
+    );
+  }
+}
+
+class StaffContact {
+  const StaffContact({
+    required this.id,
+    required this.name,
+    required this.role,
+    this.jobTitle = '',
+    this.email = '',
+    this.phone = '',
+    this.profilePhotoUrl = '',
+  });
+
+  final String id;
+  final String name;
+  final String role;
+  final String jobTitle;
+  final String email;
+  final String phone;
+  final String profilePhotoUrl;
+
+  String get initials {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    final value = parts.take(2).map((p) => p[0].toUpperCase()).join();
+    return value.isEmpty ? 'SN' : value;
+  }
+
+  String get roleLabel {
+    if (role == 'company_admin') return 'Admin';
+    if (role == 'manager') return 'Manager';
+    return 'Contact';
+  }
+
+  Map<String, Object?> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'role': role,
+      'jobTitle': jobTitle,
+      'email': email,
+      'phone': phone,
+      'profilePhotoUrl': profilePhotoUrl,
+    };
+  }
+
+  factory StaffContact.fromJson(Map<dynamic, dynamic> json) {
+    return StaffContact(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      role: json['role'] as String? ?? '',
+      jobTitle: json['jobTitle'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
       profilePhotoUrl: json['profilePhotoUrl'] as String? ?? '',
     );
   }

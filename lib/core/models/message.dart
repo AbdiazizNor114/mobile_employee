@@ -8,6 +8,8 @@ class AppMessage {
     this.senderMemberId,
     this.recipientMemberId,
     this.isRead = false,
+    this.reactionCounts = const {},
+    this.myReaction,
   });
 
   final String id;
@@ -18,6 +20,8 @@ class AppMessage {
   final String? senderMemberId;
   final String? recipientMemberId;
   final bool isRead;
+  final Map<String, int> reactionCounts;
+  final String? myReaction;
 
   factory AppMessage.fromJson(Map<dynamic, dynamic> json) {
     return AppMessage(
@@ -34,6 +38,8 @@ class AppMessage {
       senderMemberId: json['sender_member_id'] as String?,
       recipientMemberId: json['recipient_member_id'] as String?,
       isRead: (json['is_read'] as bool?) ?? false,
+      reactionCounts: _parseReactionCounts(json['reaction_counts']),
+      myReaction: json['my_reaction'] as String?,
     );
   }
 
@@ -47,5 +53,17 @@ class AppMessage {
         'sender_member_id': senderMemberId,
         'recipient_member_id': recipientMemberId,
         'is_read': isRead,
+        'reaction_counts': reactionCounts,
+        'my_reaction': myReaction,
       };
+}
+
+Map<String, int> _parseReactionCounts(Object? value) {
+  if (value is! Map) return const {};
+  return value.map(
+    (key, count) => MapEntry(
+      '$key',
+      count is int ? count : int.tryParse('$count') ?? 0,
+    ),
+  );
 }

@@ -53,24 +53,40 @@ final companyPlanProvider = StateProvider<String>((ref) {
   return ref.watch(storageServiceProvider).readCompanyPlan();
 });
 
+final enabledLanguagesProvider = StateProvider<List<String>>((ref) {
+  return ref.watch(storageServiceProvider).readEnabledLanguages();
+});
+
 final languageCodeProvider =
     StateNotifierProvider<LanguageCodeController, String>((ref) {
   final storage = ref.watch(storageServiceProvider);
   return LanguageCodeController(
     storage.readLanguageCode(),
     storage: storage,
+    syncService: ref.watch(workerSyncServiceProvider),
   );
 });
 
 class LanguageCodeController extends StateNotifier<String> {
-  LanguageCodeController(super.state, {required this.storage});
+  LanguageCodeController(
+    super.state, {
+    required this.storage,
+    required this.syncService,
+  });
 
   final StorageService storage;
+  final WorkerSyncService syncService;
 
-  void setLanguage(String languageCode) {
-    final next = languageCode == 'so' ? 'so' : 'en';
+  Future<void> setLanguage(String languageCode) async {
+    final next =
+        const {'en', 'so', 'sw'}.contains(languageCode) ? languageCode : 'en';
     state = next;
-    storage.saveLanguageCode(next);
+    await storage.saveLanguageCode(next);
+    try {
+      await syncService.updatePreferredLanguage(next);
+    } catch (_) {
+      // Keep the local preference and retry through a future profile update.
+    }
   }
 }
 
@@ -112,9 +128,11 @@ final resetWorkDataProvider = Provider<void Function()>((ref) {
     ref.read(shiftsProvider.notifier).reset();
     ref.read(activityProvider.notifier).reset();
     ref.read(messagesProvider.notifier).reset();
+    ref.read(staffContactsProvider.notifier).reset();
     ref.read(absenceRequestsProvider.notifier).reset();
     ref.read(timeEntriesProvider.notifier).reset();
     ref.read(companyPlanProvider.notifier).state = 'free';
+    ref.read(enabledLanguagesProvider.notifier).state = const ['en'];
     ref.read(cacheLastUpdatedProvider.notifier).state = null;
   };
 });

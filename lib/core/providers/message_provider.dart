@@ -58,6 +58,8 @@ class MessageController extends StateNotifier<List<AppMessage>> {
             senderMemberId: m.senderMemberId,
             recipientMemberId: m.recipientMemberId,
             isRead: true,
+            reactionCounts: m.reactionCounts,
+            myReaction: m.myReaction,
           )
         else
           m,
@@ -68,7 +70,60 @@ class MessageController extends StateNotifier<List<AppMessage>> {
     });
   }
 
+  Future<void> toggleReaction(String messageId, String emoji) async {
+    final message = state.where((m) => m.id == messageId).firstOrNull;
+    if (message == null) return;
+
+    final nextReaction = message.myReaction == emoji ? null : emoji;
+    final previous = state;
+    state = [
+      for (final m in state)
+        if (m.id == messageId) _copyMessageWithReaction(m, nextReaction) else m,
+    ];
+    storage.saveMessages(state.map((m) => m.toJson()).toList()).then((_) {
+      storage.touchLastUpdated().then(onCacheUpdated);
+    });
+
+    try {
+      await syncService.setMessageReaction(messageId, nextReaction);
+    } catch (_) {
+      state = previous;
+      storage.saveMessages(state.map((m) => m.toJson()).toList()).then((_) {
+        storage.touchLastUpdated().then(onCacheUpdated);
+      });
+      rethrow;
+    }
+  }
+
   void reset() {
     state = const [];
   }
+}
+
+AppMessage _copyMessageWithReaction(AppMessage message, String? nextReaction) {
+  final counts = Map<String, int>.from(message.reactionCounts);
+  final previousReaction = message.myReaction;
+  if (previousReaction != null) {
+    final nextCount = (counts[previousReaction] ?? 0) - 1;
+    if (nextCount <= 0) {
+      counts.remove(previousReaction);
+    } else {
+      counts[previousReaction] = nextCount;
+    }
+  }
+  if (nextReaction != null) {
+    counts[nextReaction] = (counts[nextReaction] ?? 0) + 1;
+  }
+  return AppMessage(
+    id: message.id,
+    senderName: message.senderName,
+    subject: message.subject,
+    content: message.content,
+    sentAt: message.sentAt,
+    senderMemberId: message.senderMemberId,
+    recipientMemberId: message.recipientMemberId,
+    isRead: message.isRead,
+    reactionCounts: counts,
+    myReaction: nextReaction,
+  );
 }

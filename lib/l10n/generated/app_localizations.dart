@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
 import 'app_localizations_so.dart';
+import 'app_localizations_sw.dart';
 
 // ignore_for_file: type=lint
 
@@ -95,7 +96,8 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('so')
+    Locale('so'),
+    Locale('sw')
   ];
 
   /// No description provided for @appTitle.
@@ -157,6 +159,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Activity'**
   String get activity;
+
+  /// No description provided for @messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get messages;
+
+  /// No description provided for @hub.
+  ///
+  /// In en, this message translates to:
+  /// **'Team Hub'**
+  String get hub;
 
   /// No description provided for @hours.
   ///
@@ -259,6 +273,450 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last updated just now'**
   String get lastUpdated;
+
+  /// No description provided for @role.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get role;
+
+  /// No description provided for @phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get phone;
+
+  /// No description provided for @company.
+  ///
+  /// In en, this message translates to:
+  /// **'Company'**
+  String get company;
+
+  /// No description provided for @notProvided.
+  ///
+  /// In en, this message translates to:
+  /// **'Not provided'**
+  String get notProvided;
+
+  /// No description provided for @preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get preferences;
+
+  /// No description provided for @appLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'App language'**
+  String get appLanguage;
+
+  /// No description provided for @englishName.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get englishName;
+
+  /// No description provided for @somaliName.
+  ///
+  /// In en, this message translates to:
+  /// **'Somali'**
+  String get somaliName;
+
+  /// No description provided for @swahiliName.
+  ///
+  /// In en, this message translates to:
+  /// **'Swahili'**
+  String get swahiliName;
+
+  /// No description provided for @documents.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get documents;
+
+  /// No description provided for @employmentDocumentsManaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Employment documents are managed by your workplace.'**
+  String get employmentDocumentsManaged;
+
+  /// No description provided for @all.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get all;
+
+  /// No description provided for @confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get confirmed;
+
+  /// No description provided for @open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get open;
+
+  /// No description provided for @openShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shift'**
+  String get openShift;
+
+  /// No description provided for @changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed'**
+  String get changed;
+
+  /// No description provided for @thisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get thisWeek;
+
+  /// No description provided for @shiftsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Shifts for {date}'**
+  String shiftsFor(String date);
+
+  /// No description provided for @shiftCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No shifts} =1{1 shift} other{{count} shifts}}'**
+  String shiftCount(int count);
+
+  /// No description provided for @noShiftsMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No shifts match this filter right now.'**
+  String get noShiftsMatch;
+
+  /// No description provided for @date.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get date;
+
+  /// No description provided for @time.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get time;
+
+  /// No description provided for @duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get duration;
+
+  /// No description provided for @notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get notes;
+
+  /// No description provided for @openShiftNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shift. Accepting it will notify the coordinator.'**
+  String get openShiftNote;
+
+  /// No description provided for @noManagerNote.
+  ///
+  /// In en, this message translates to:
+  /// **'No manager note for this shift.'**
+  String get noManagerNote;
+
+  /// No description provided for @acceptOpenShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept open shift'**
+  String get acceptOpenShift;
+
+  /// No description provided for @accepting.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepting...'**
+  String get accepting;
+
+  /// No description provided for @shiftUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift no longer available'**
+  String get shiftUnavailable;
+
+  /// No description provided for @alreadyAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Already assigned'**
+  String get alreadyAssigned;
+
+  /// No description provided for @shiftAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shift accepted and added to your schedule.'**
+  String get shiftAccepted;
+
+  /// No description provided for @shiftAcceptFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not accept shift. Please try again later.'**
+  String get shiftAcceptFailed;
+
+  /// No description provided for @hoursAndBreak.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hours, {minutes} min break'**
+  String hoursAndBreak(String hours, int minutes);
+
+  /// No description provided for @dateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Date range'**
+  String get dateRange;
+
+  /// No description provided for @change.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get change;
+
+  /// No description provided for @thisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This month'**
+  String get thisMonth;
+
+  /// No description provided for @lastSevenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get lastSevenDays;
+
+  /// No description provided for @totalShiftHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Total shift hours'**
+  String get totalShiftHours;
+
+  /// No description provided for @workDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Work days'**
+  String get workDays;
+
+  /// No description provided for @averageShiftLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg shift length'**
+  String get averageShiftLength;
+
+  /// No description provided for @timeBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Time balance'**
+  String get timeBalance;
+
+  /// No description provided for @bookedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked days'**
+  String get bookedDays;
+
+  /// No description provided for @noBookedShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'No booked shifts in this range'**
+  String get noBookedShifts;
+
+  /// No description provided for @timeReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours / Time report'**
+  String get timeReport;
+
+  /// No description provided for @chooseWorkedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose worked days'**
+  String get chooseWorkedDays;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
+  /// No description provided for @activities.
+  ///
+  /// In en, this message translates to:
+  /// **'Activities'**
+  String get activities;
+
+  /// No description provided for @unreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unread'**
+  String unreadCount(int count);
+
+  /// No description provided for @markAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get markAllRead;
+
+  /// No description provided for @noActivityYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity yet.'**
+  String get noActivityYet;
+
+  /// No description provided for @justNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get justNow;
+
+  /// No description provided for @minutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min ago'**
+  String minutesAgo(int count);
+
+  /// No description provided for @hoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h ago'**
+  String hoursAgo(int count);
+
+  /// No description provided for @daysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} d ago'**
+  String daysAgo(int count);
+
+  /// No description provided for @aiOverdueConfirmations.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: You missed the 7-day confirmation window for {count, plural, =1{1 shift} other{{count} shifts}}. Ask your manager to review.'**
+  String aiOverdueConfirmations(int count);
+
+  /// No description provided for @aiPendingConfirmations.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: {count, plural, =1{1 completed shift is} other{{count} completed shifts are}} waiting for confirmation. Confirm within 7 days of each shift.'**
+  String aiPendingConfirmations(int count);
+
+  /// No description provided for @aiNoAssignedShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: No assigned shifts in this range yet. Widen the date range to check other days.'**
+  String get aiNoAssignedShifts;
+
+  /// No description provided for @aiScheduledNoneCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: You have {hours} scheduled hours in this range, but none completed yet.'**
+  String aiScheduledNoneCompleted(String hours);
+
+  /// No description provided for @aiAllHoursCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: Great consistency. All scheduled hours in this range are completed.'**
+  String get aiAllHoursCompleted;
+
+  /// No description provided for @aiHoursProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: {completed}h completed, {remaining}h remaining, with {breakHours}h break time scheduled.'**
+  String aiHoursProgress(String completed, String remaining, String breakHours);
+
+  /// No description provided for @shifts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shifts'**
+  String get shifts;
+
+  /// No description provided for @absence.
+  ///
+  /// In en, this message translates to:
+  /// **'Absence'**
+  String get absence;
+
+  /// No description provided for @information.
+  ///
+  /// In en, this message translates to:
+  /// **'Information'**
+  String get information;
+
+  /// No description provided for @noUpcomingShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'No upcoming shifts yet'**
+  String get noUpcomingShifts;
+
+  /// No description provided for @shiftConfirmations.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift confirmations'**
+  String get shiftConfirmations;
+
+  /// No description provided for @confirmWithinSevenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm completed shifts within 7 days.'**
+  String get confirmWithinSevenDays;
+
+  /// No description provided for @confirming.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming...'**
+  String get confirming;
+
+  /// No description provided for @confirmWorked.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm worked'**
+  String get confirmWorked;
+
+  /// No description provided for @confirmedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed {date}'**
+  String confirmedOn(String date);
+
+  /// No description provided for @confirmWorkedQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm worked shift?'**
+  String get confirmWorkedQuestion;
+
+  /// No description provided for @confirmAttestation.
+  ///
+  /// In en, this message translates to:
+  /// **'I confirm that I worked this shift as scheduled.'**
+  String get confirmAttestation;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @shiftConfirmedAsWorked.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift confirmed as worked.'**
+  String get shiftConfirmedAsWorked;
+
+  /// No description provided for @shiftConfirmationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not confirm this shift. Please try again.'**
+  String get shiftConfirmationFailed;
 }
 
 class _AppLocalizationsDelegate
@@ -272,7 +730,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'so'].contains(locale.languageCode);
+      <String>['en', 'so', 'sw'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -285,6 +743,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsEn();
     case 'so':
       return AppLocalizationsSo();
+    case 'sw':
+      return AppLocalizationsSw();
   }
 
   throw FlutterError(

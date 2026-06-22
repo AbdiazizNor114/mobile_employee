@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
+import 'core/config/app_config.dart';
 import 'core/providers/service_providers.dart';
 
 void main() {
@@ -23,7 +24,9 @@ class ShaqoNetEmployeeBootstrap extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'ShaqoNet could not start. Check the mobile app configuration.',
+            error is AppConfigException
+                ? error.message
+                : 'ShaqoNet could not start. Check the mobile app configuration.',
             textAlign: TextAlign.center,
           ),
         ),

@@ -19,7 +19,9 @@ class StorageService {
   static const _userIdKey = 'user_id';
   static const _companyNameKey = 'company_name';
   static const _companyPlanKey = 'company_plan';
+  static const _enabledLanguagesKey = 'enabled_languages';
   static const _messagesKey = 'messages';
+  static const _staffContactsKey = 'staff_contacts';
   static const _absenceRequestsKey = 'absence_requests';
   static const _timeEntriesKey = 'time_entries';
 
@@ -157,6 +159,23 @@ class StorageService {
     await _write(_companyPlanKey, normalized.isEmpty ? 'free' : normalized);
   }
 
+  List<String> readEnabledLanguages() {
+    final value = _read(_enabledLanguagesKey);
+    if (value is! List) return const ['en'];
+    final languages = value.whereType<String>().toSet().toList();
+    if (!languages.contains('en')) languages.insert(0, 'en');
+    return languages;
+  }
+
+  Future<void> saveEnabledLanguages(List<String> languages) async {
+    final normalized = languages
+        .where((code) => const {'en', 'so', 'sw'}.contains(code))
+        .toSet()
+        .toList();
+    if (!normalized.contains('en')) normalized.insert(0, 'en');
+    await _write(_enabledLanguagesKey, normalized);
+  }
+
   List<Map>? readMessages() {
     final data = _read(_messagesKey);
     if (data is! List) return null;
@@ -165,6 +184,22 @@ class StorageService {
 
   Future<void> saveMessages(List<Map> messages) async {
     await _write(_messagesKey, messages);
+  }
+
+  List<StaffContact>? readStaffContacts() {
+    final data = _read(_staffContactsKey);
+    if (data is! List) return null;
+    return data
+        .whereType<Map<dynamic, dynamic>>()
+        .map(StaffContact.fromJson)
+        .toList();
+  }
+
+  Future<void> saveStaffContacts(List<StaffContact> contacts) async {
+    await _write(
+      _staffContactsKey,
+      contacts.map((contact) => contact.toJson()).toList(),
+    );
   }
 
   List<AbsenceRequest>? readAbsenceRequests() {
@@ -209,6 +244,7 @@ class StorageService {
     await _write(_userIdKey, null);
     await _write(_companyNameKey, null);
     await _write(_companyPlanKey, null);
+    await _write(_enabledLanguagesKey, null);
   }
 
   Future<void> clearWorkCache() async {
@@ -216,6 +252,7 @@ class StorageService {
     await _write(_shiftsKey, null);
     await _write(_activitiesKey, null);
     await _write(_messagesKey, null);
+    await _write(_staffContactsKey, null);
     await _write(_absenceRequestsKey, null);
     await _write(_timeEntriesKey, null);
     await _write(_lastUpdatedKey, null);

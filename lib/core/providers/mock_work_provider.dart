@@ -120,8 +120,9 @@ class ShiftController extends StateNotifier<List<Shift>> {
 
   Future<void> acceptShift(String shiftId) async {
     Shift? acceptedShift;
+    final now = DateTime.now();
     for (final shift in state) {
-      if (shift.id == shiftId && shift.status == ShiftStatus.available) {
+      if (shift.id == shiftId && shift.canBeAccepted(now)) {
         acceptedShift = shift.copyWith(status: ShiftStatus.confirmed);
         break;
       }
@@ -139,6 +140,27 @@ class ShiftController extends StateNotifier<List<Shift>> {
 
     storage.saveShifts(state).then(onCacheUpdated);
     onShiftAccepted(acceptedShift);
+  }
+
+  Future<void> confirmShiftWorked(String shiftId) async {
+    final shift = state.where((item) => item.id == shiftId).firstOrNull;
+    if (shift == null || !shift.canConfirmWork()) {
+      throw StateError('This shift is not eligible for confirmation.');
+    }
+
+    final confirmedAt = await syncService.confirmShiftWork(shiftId);
+    state = [
+      for (final item in state)
+        if (item.id == shiftId)
+          item.copyWith(
+            workConfirmationStatus: WorkConfirmationStatus.confirmed,
+            workConfirmationSource: 'employee',
+            workConfirmedAt: confirmedAt,
+          )
+        else
+          item,
+    ];
+    storage.saveShifts(state).then(onCacheUpdated);
   }
 
   void replaceAll(List<Shift> shifts) {
@@ -178,6 +200,40 @@ final activityProvider =
         ref.read(cacheLastUpdatedProvider.notifier).state = updatedAt,
   );
 });
+
+final staffContactsProvider =
+    StateNotifierProvider<StaffContactsController, List<StaffContact>>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  final cachedContacts = storage.readStaffContacts();
+  return StaffContactsController(
+    cachedContacts ?? const [],
+    storage: storage,
+    onCacheUpdated: (updatedAt) =>
+        ref.read(cacheLastUpdatedProvider.notifier).state = updatedAt,
+  );
+});
+
+class StaffContactsController extends StateNotifier<List<StaffContact>> {
+  StaffContactsController(
+    super.state, {
+    required this.storage,
+    required this.onCacheUpdated,
+  });
+
+  final StorageService storage;
+  final void Function(DateTime updatedAt) onCacheUpdated;
+
+  void replaceAll(List<StaffContact> contacts) {
+    state = contacts;
+    storage.saveStaffContacts(contacts).then((_) {
+      storage.touchLastUpdated().then(onCacheUpdated);
+    });
+  }
+
+  void reset() {
+    state = const [];
+  }
+}
 
 final unreadActivityCountProvider = Provider<int>((ref) {
   return ref.watch(activityProvider).where((item) => item.isUnread).length;
@@ -248,12 +304,10 @@ class AbsenceRequestController extends StateNotifier<List<AbsenceRequest>> {
 final timeEntriesProvider =
     StateNotifierProvider<TimeEntryController, List<TimeEntry>>((ref) {
   final storage = ref.watch(storageServiceProvider);
-  final syncService = ref.watch(workerSyncServiceProvider);
   final cachedEntries = storage.readTimeEntries();
   return TimeEntryController(
     cachedEntries ?? const [],
     storage: storage,
-    syncService: syncService,
     onCacheUpdated: (updatedAt) =>
         ref.read(cacheLastUpdatedProvider.notifier).state = updatedAt,
   );
@@ -263,36 +317,11 @@ class TimeEntryController extends StateNotifier<List<TimeEntry>> {
   TimeEntryController(
     super.state, {
     required this.storage,
-    required this.syncService,
     required this.onCacheUpdated,
   });
 
   final StorageService storage;
-  final WorkerSyncService syncService;
   final void Function(DateTime updatedAt) onCacheUpdated;
-
-  Future<void> clockIn({String? shiftId}) async {
-    final entry = await syncService.clockIn(shiftId: shiftId);
-    state = [entry, ...state.where((item) => item.id != entry.id)];
-    storage.saveTimeEntries(state).then(onCacheUpdated);
-  }
-
-  Future<void> clockOut({
-    required String entryId,
-    int breakMinutes = 0,
-    String notes = '',
-  }) async {
-    final entry = await syncService.clockOut(
-      entryId: entryId,
-      breakMinutes: breakMinutes,
-      notes: notes,
-    );
-    state = [
-      for (final item in state)
-        if (item.id == entry.id) entry else item,
-    ];
-    storage.saveTimeEntries(state).then(onCacheUpdated);
-  }
 
   void replaceAll(List<TimeEntry> entries) {
     final sorted = [...entries]
