@@ -10,6 +10,7 @@ import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/message_provider.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 enum _MessageFilter { inbox, unread, sent }
 
@@ -156,6 +157,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final messages = ref.watch(messagesProvider);
     final plan = ref.watch(companyPlanProvider).toLowerCase();
     final membershipId = ref.watch(authServiceProvider).membershipId;
@@ -184,7 +186,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         children: [
           _MessagesHeader(
             accent: accent,
-            title: isEnterprise ? 'Team Hub' : 'Messages',
+            title: isEnterprise ? l10n.hub : l10n.messages,
             isSending: _isSending,
             canCompose: canCompose,
             isHub: isEnterprise,
@@ -198,13 +200,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               child: Row(
                 children: [
                   _MailboxTab(
-                    label: 'Hub',
+                    label: l10n.hub,
                     isSelected: _hubSection == _HubSection.feed,
                     accent: accent,
                     onTap: () => setState(() => _hubSection = _HubSection.feed),
                   ),
                   _MailboxTab(
-                    label: 'Contacts',
+                    label: l10n.contacts,
                     isSelected: _hubSection == _HubSection.contacts,
                     accent: accent,
                     onTap: () =>
@@ -219,20 +221,20 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               child: Row(
                 children: [
                   _MailboxTab(
-                    label: 'Inbox',
+                    label: l10n.inbox,
                     isSelected: _filter == _MessageFilter.inbox,
                     accent: accent,
                     onTap: () => setState(() => _filter = _MessageFilter.inbox),
                   ),
                   _MailboxTab(
-                    label: 'Unread $unreadCount',
+                    label: l10n.unreadWithCount(unreadCount),
                     isSelected: _filter == _MessageFilter.unread,
                     accent: accent,
                     onTap: () =>
                         setState(() => _filter = _MessageFilter.unread),
                   ),
                   _MailboxTab(
-                    label: 'Sent',
+                    label: l10n.sent,
                     isSelected: _filter == _MessageFilter.sent,
                     accent: accent,
                     onTap: () => setState(() => _filter = _MessageFilter.sent),
@@ -872,6 +874,7 @@ class _MessageDetailPage extends ConsumerStatefulWidget {
 class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final comments = widget.thread
         .where((item) => item.id != widget.message.id)
         .toList()
@@ -884,10 +887,10 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
         foregroundColor: AppColors.cardBackground,
         title: Text(
           widget.canUseTeamHub
-              ? 'Hub thread'
+              ? l10n.hub
               : (widget.isSent
-                  ? 'Sent message'
-                  : 'Message from ${widget.message.senderName}'),
+                  ? l10n.sentMessage
+                  : l10n.messageFrom(widget.message.senderName)),
         ),
       ),
       body: ListView(
@@ -897,7 +900,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
             message: widget.message,
             accent: widget.accent,
             title: widget.message.subject,
-            authorLabel: widget.isSent ? 'You' : widget.message.senderName,
+            authorLabel: widget.isSent ? l10n.you : widget.message.senderName,
             onReact: (emoji) => ref
                 .read(messagesProvider.notifier)
                 .toggleReaction(widget.message.id, emoji),
@@ -965,7 +968,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                     },
                     icon: const Icon(Icons.reply_rounded),
                     label:
-                        Text(widget.canUseTeamHub ? 'Comment in hub' : 'Reply'),
+                        Text(widget.canUseTeamHub ? l10n.comment : l10n.reply),
                   ),
                 ),
               ],
@@ -1162,6 +1165,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -1170,8 +1174,8 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
         title: Text(widget.hubOnly
             ? 'Post hub comment'
             : widget.canUseTeamHub
-                ? 'Post or private text'
-                : 'Write message'),
+                ? l10n.writeMessage
+                : l10n.writeMessage),
         actions: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -1182,7 +1186,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          Text(widget.hubOnly ? 'Hub topic' : 'Subject',
+          Text(widget.hubOnly ? l10n.hub : l10n.subject,
               style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
@@ -1191,20 +1195,20 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             decoration: InputDecoration(
               hintText: widget.hubOnly
                   ? 'What should the team track?'
-                  : 'What is this about?',
+                  : l10n.whatIsThisAbout,
               filled: true,
               fillColor: AppColors.cardBackground,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
           if (!widget.hubOnly) ...[
-            Text('Audience', style: AppTypography.headingSmall),
+            Text(l10n.audience, style: AppTypography.headingSmall),
             const SizedBox(height: AppSpacing.sm),
             _AudienceOption(
-              title: 'Managers',
+              title: l10n.managers,
               subtitle: widget.canUseTeamHub
                   ? 'Send a private text to managers.'
-                  : 'Send directly to your managers.',
+                  : l10n.sendDirectlyToManagers,
               value: _ComposeAudience.managers,
               groupValue: _audience,
               accent: widget.accent,
@@ -1212,7 +1216,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             ),
             if (widget.canUseTeamHub)
               _AudienceOption(
-                title: 'Team hub',
+                title: l10n.hub,
                 subtitle: 'Post so everyone can see and comment.',
                 value: _ComposeAudience.teamHub,
                 groupValue: _audience,
@@ -1237,7 +1241,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             ),
             const SizedBox(height: AppSpacing.lg),
           ],
-          Text(widget.hubOnly ? 'Comment' : 'Message',
+          Text(widget.hubOnly ? l10n.comment : l10n.message,
               style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
@@ -1248,7 +1252,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             decoration: InputDecoration(
               hintText: widget.hubOnly
                   ? 'Add a hub comment for your team...'
-                  : 'Write your message...',
+                  : l10n.writeYourMessage,
               filled: true,
               fillColor: AppColors.cardBackground,
             ),
@@ -1262,7 +1266,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                 ? 'Post comment'
                 : _audience == _ComposeAudience.teamHub
                     ? 'Post to hub'
-                    : 'Send private text'),
+                    : l10n.sendPrivateText),
           ),
         ],
       ),
@@ -1367,10 +1371,11 @@ class _NoMessagesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final label = switch (filter) {
-      _MessageFilter.inbox => 'No messages yet',
-      _MessageFilter.unread => 'No unread messages',
-      _MessageFilter.sent => 'No sent messages',
+      _MessageFilter.inbox => l10n.noMessagesYet,
+      _MessageFilter.unread => l10n.noUnreadMessages,
+      _MessageFilter.sent => l10n.noSentMessages,
     };
 
     return ListView(

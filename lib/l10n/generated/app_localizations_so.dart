@@ -371,4 +371,121 @@ class AppLocalizationsSo extends AppLocalizations {
   @override
   String get shiftConfirmationFailed =>
       'Shaqada lama xaqiijin karin. Fadlan mar kale isku day.';
+
+  @override
+  String get inbox => 'Farriimaha soo galay';
+
+  @override
+  String unreadWithCount(int count) {
+    return 'Aan la akhriyin $count';
+  }
+
+  @override
+  String get sent => 'La diray';
+
+  @override
+  String get subject => 'Cinwaanka';
+
+  @override
+  String get audience => 'Cidda loo dirayo';
+
+  @override
+  String get message => 'Farriin';
+
+  @override
+  String get managers => 'Maamulayaasha';
+
+  @override
+  String get contacts => 'Xiriirrada';
+
+  @override
+  String get writeMessage => 'Qor farriin';
+
+  @override
+  String get whatIsThisAbout => 'Farriintani maxay ku saabsan tahay?';
+
+  @override
+  String get sendDirectlyToManagers => 'Si gaar ah ugu dir maamulayaashaada.';
+
+  @override
+  String get writeYourMessage => 'Farriintaada qor...';
+
+  @override
+  String get sendPrivateText => 'Dir farriin gaar ah';
+
+  @override
+  String get noMessagesYet => 'Weli farriimo ma jiraan';
+
+  @override
+  String get noUnreadMessages => 'Farriimo aan la akhriyin ma jiraan';
+
+  @override
+  String get noSentMessages => 'Farriimo la diray ma jiraan';
+
+  @override
+  String get you => 'Adiga';
+
+  @override
+  String get sentMessage => 'Farriin la diray';
+
+  @override
+  String messageFrom(String name) {
+    return 'Farriin ka timid $name';
+  }
+
+  @override
+  String get reply => 'Ka jawaab';
+
+  @override
+  String get comment => 'Faallo';
+
+  @override
+  String get editProfile => 'Wax ka beddel xogtayda';
+
+  @override
+  String get chooseFromGallery => 'Sawirrada ka dooro';
+
+  @override
+  String get remove => 'Ka saar';
+
+  @override
+  String get firstName => 'Magaca hore';
+
+  @override
+  String get lastName => 'Magaca dambe';
+
+  @override
+  String get phoneNumber => 'Lambarka telefoonka';
+
+  @override
+  String get jobTitle => 'Jagada shaqada';
+
+  @override
+  String get extraInformation => 'Macluumaad dheeraad ah';
+
+  @override
+  String get workplaceManagesExtraInfo =>
+      'Xiriirka degdegga ah, shahaadooyinka, iyo faahfaahinta shaqada waxaa maamusha goobtaada shaqada.';
+
+  @override
+  String get saveProfile => 'Kaydi xogtayda';
+
+  @override
+  String get profileSaved => 'Xogtaada waa la kaydiyay.';
+
+  @override
+  String get profileSaveFailed =>
+      'Xogta lama kaydin karin. Fadlan mar kale isku day.';
+
+  @override
+  String get validProfileRequired =>
+      'Geli magaca hore, magaca dambe, iyo iimayl sax ah.';
+
+  @override
+  String get imageTooLarge =>
+      'Sawirku aad buu u weyn yahay. Dooro sawir ka yar.';
+
+  @override
+  String get imagePickFailed =>
+      'Sawirka lama dooran karin. Fadlan mar kale isku day.';
 }

@@ -372,4 +372,121 @@ class AppLocalizationsSw extends AppLocalizations {
   @override
   String get shiftConfirmationFailed =>
       'Zamu haikuweza kuthibitishwa. Tafadhali jaribu tena.';
+
+  @override
+  String get inbox => 'Kikasha';
+
+  @override
+  String unreadWithCount(int count) {
+    return 'Hazijasomwa $count';
+  }
+
+  @override
+  String get sent => 'Zilizotumwa';
+
+  @override
+  String get subject => 'Kichwa';
+
+  @override
+  String get audience => 'Wapokeaji';
+
+  @override
+  String get message => 'Ujumbe';
+
+  @override
+  String get managers => 'Wasimamizi';
+
+  @override
+  String get contacts => 'Mawasiliano';
+
+  @override
+  String get writeMessage => 'Andika ujumbe';
+
+  @override
+  String get whatIsThisAbout => 'Ujumbe huu unahusu nini?';
+
+  @override
+  String get sendDirectlyToManagers =>
+      'Tuma moja kwa moja kwa wasimamizi wako.';
+
+  @override
+  String get writeYourMessage => 'Andika ujumbe wako...';
+
+  @override
+  String get sendPrivateText => 'Tuma ujumbe binafsi';
+
+  @override
+  String get noMessagesYet => 'Bado hakuna ujumbe';
+
+  @override
+  String get noUnreadMessages => 'Hakuna ujumbe ambao haujasomwa';
+
+  @override
+  String get noSentMessages => 'Hakuna ujumbe uliotumwa';
+
+  @override
+  String get you => 'Wewe';
+
+  @override
+  String get sentMessage => 'Ujumbe uliotumwa';
+
+  @override
+  String messageFrom(String name) {
+    return 'Ujumbe kutoka kwa $name';
+  }
+
+  @override
+  String get reply => 'Jibu';
+
+  @override
+  String get comment => 'Maoni';
+
+  @override
+  String get editProfile => 'Hariri wasifu';
+
+  @override
+  String get chooseFromGallery => 'Chagua kutoka kwenye picha';
+
+  @override
+  String get remove => 'Ondoa';
+
+  @override
+  String get firstName => 'Jina la kwanza';
+
+  @override
+  String get lastName => 'Jina la mwisho';
+
+  @override
+  String get phoneNumber => 'Nambari ya simu';
+
+  @override
+  String get jobTitle => 'Cheo cha kazi';
+
+  @override
+  String get extraInformation => 'Taarifa za ziada';
+
+  @override
+  String get workplaceManagesExtraInfo =>
+      'Mawasiliano ya dharura, vyeti na maelezo ya ajira yanasimamiwa na mahali pako pa kazi.';
+
+  @override
+  String get saveProfile => 'Hifadhi wasifu';
+
+  @override
+  String get profileSaved => 'Wasifu umehifadhiwa.';
+
+  @override
+  String get profileSaveFailed =>
+      'Wasifu haukuweza kuhifadhiwa. Tafadhali jaribu tena.';
+
+  @override
+  String get validProfileRequired =>
+      'Weka jina la kwanza, jina la mwisho na barua pepe sahihi.';
+
+  @override
+  String get imageTooLarge => 'Picha ni kubwa sana. Chagua picha ndogo zaidi.';
+
+  @override
+  String get imagePickFailed =>
+      'Picha haikuweza kuchaguliwa. Tafadhali jaribu tena.';
 }

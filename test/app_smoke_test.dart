@@ -55,4 +55,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Profile'), findsWidgets);
   });
+
+  testWidgets('opens the schedule in Somali without locale errors', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appBootstrapProvider.overrideWith((ref) async {}),
+          currentSessionProvider.overrideWith((ref) => true),
+        ],
+        child: const ShaqoNetEmployeeBootstrap(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ShaqoNetEmployeeBootstrap)),
+    );
+    await container.read(languageCodeProvider.notifier).setLanguage('so');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Jadwalka'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Toddobaadkan'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -369,4 +369,118 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shiftConfirmationFailed =>
       'Could not confirm this shift. Please try again.';
+
+  @override
+  String get inbox => 'Inbox';
+
+  @override
+  String unreadWithCount(int count) {
+    return 'Unread $count';
+  }
+
+  @override
+  String get sent => 'Sent';
+
+  @override
+  String get subject => 'Subject';
+
+  @override
+  String get audience => 'Audience';
+
+  @override
+  String get message => 'Message';
+
+  @override
+  String get managers => 'Managers';
+
+  @override
+  String get contacts => 'Contacts';
+
+  @override
+  String get writeMessage => 'Write message';
+
+  @override
+  String get whatIsThisAbout => 'What is this about?';
+
+  @override
+  String get sendDirectlyToManagers => 'Send directly to your managers.';
+
+  @override
+  String get writeYourMessage => 'Write your message...';
+
+  @override
+  String get sendPrivateText => 'Send private text';
+
+  @override
+  String get noMessagesYet => 'No messages yet';
+
+  @override
+  String get noUnreadMessages => 'No unread messages';
+
+  @override
+  String get noSentMessages => 'No sent messages';
+
+  @override
+  String get you => 'You';
+
+  @override
+  String get sentMessage => 'Sent message';
+
+  @override
+  String messageFrom(String name) {
+    return 'Message from $name';
+  }
+
+  @override
+  String get reply => 'Reply';
+
+  @override
+  String get comment => 'Comment';
+
+  @override
+  String get editProfile => 'Edit profile';
+
+  @override
+  String get chooseFromGallery => 'Choose from gallery';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String get firstName => 'First name';
+
+  @override
+  String get lastName => 'Last name';
+
+  @override
+  String get phoneNumber => 'Phone number';
+
+  @override
+  String get jobTitle => 'Job title';
+
+  @override
+  String get extraInformation => 'Extra information';
+
+  @override
+  String get workplaceManagesExtraInfo =>
+      'Emergency contact, certificates, and employment notes are managed by your workplace.';
+
+  @override
+  String get saveProfile => 'Save profile';
+
+  @override
+  String get profileSaved => 'Profile saved.';
+
+  @override
+  String get profileSaveFailed => 'Could not save profile. Please try again.';
+
+  @override
+  String get validProfileRequired =>
+      'Add first name, last name, and a valid email.';
+
+  @override
+  String get imageTooLarge => 'Image is too large. Choose a smaller photo.';
+
+  @override
+  String get imagePickFailed => 'Could not pick image. Please try again.';
 }

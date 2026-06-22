@@ -13,6 +13,7 @@ import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/profile_form_field.dart';
 import '../../core/widgets/shaqonet_card.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -70,11 +71,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final l10n = AppLocalizations.of(context);
     final existing = ref.read(employeeProfileProvider);
     if (!_isFormValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Add first name, last name, and a valid email.'),
+        SnackBar(
+          content: Text(l10n.validProfileRequired),
         ),
       );
       return;
@@ -99,7 +101,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile saved.')),
+          SnackBar(content: Text(l10n.profileSaved)),
         );
         context.go('/');
       }
@@ -107,8 +109,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save profile. Please try again.'),
+          SnackBar(
+            content: Text(l10n.profileSaveFailed),
           ),
         );
       }
@@ -117,6 +119,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _pickPhotoFromGallery() async {
     if (_isLoading) return;
+    final l10n = AppLocalizations.of(context);
 
     try {
       final picked = await _picker.pickImage(
@@ -129,8 +132,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (bytes.length > _maxPhotoBytes) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Image is too large. Choose a smaller photo.'),
+            SnackBar(
+              content: Text(l10n.imageTooLarge),
             ),
           );
         }
@@ -146,8 +149,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not pick image. Please try again.'),
+          SnackBar(
+            content: Text(l10n.imagePickFailed),
           ),
         );
       }
@@ -156,6 +159,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final existing = ref.watch(employeeProfileProvider);
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 680.0 : double.infinity;
@@ -175,7 +179,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       body: Column(
         children: [
           AppHeader(
-            title: 'Edit Profile',
+            title: l10n.editProfile,
             leadingIcon: null,
             trailingIcon: Icons.close,
             onTrailingPressed: _isLoading ? null : _closeEditor,
@@ -214,7 +218,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 onPressed:
                                     _isLoading ? null : _pickPhotoFromGallery,
                                 icon: const Icon(Icons.photo_library_outlined),
-                                label: const Text('Choose from gallery'),
+                                label: Text(l10n.chooseFromGallery),
                               ),
                               if (_profilePhotoUrlController.text.isNotEmpty)
                                 TextButton(
@@ -224,7 +228,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                           _profilePhotoUrlController.clear();
                                           setState(() {});
                                         },
-                                  child: const Text('Remove'),
+                                  child: Text(l10n.remove),
                                 ),
                             ],
                           ),
@@ -233,29 +237,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ProfileFormField(
-                      label: 'First name',
+                      label: l10n.firstName,
                       controller: _firstNameController,
                       enabled: !_isLoading,
                     ),
                     ProfileFormField(
-                      label: 'Last name',
+                      label: l10n.lastName,
                       controller: _lastNameController,
                       enabled: !_isLoading,
                     ),
                     ProfileFormField(
-                      label: 'Email',
+                      label: l10n.email,
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       enabled: !_isLoading,
                     ),
                     ProfileFormField(
-                      label: 'Phone number',
+                      label: l10n.phoneNumber,
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       enabled: !_isLoading,
                     ),
                     ProfileFormField(
-                      label: 'Job title',
+                      label: l10n.jobTitle,
                       controller: _jobTitleController,
                       enabled: !_isLoading,
                     ),
@@ -270,11 +274,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         },
                         tilePadding: EdgeInsets.zero,
                         childrenPadding: EdgeInsets.zero,
-                        title: Text('Extra information',
+                        title: Text(l10n.extraInformation,
                             style: AppTypography.headingMedium),
                         children: [
                           Text(
-                            'Emergency contact, certificates, and employment notes are managed by your workplace.',
+                            l10n.workplaceManagesExtraInfo,
                             style: AppTypography.bodyMedium
                                 .copyWith(color: AppColors.mutedText),
                           ),
@@ -306,7 +310,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: _isLoading ? null : _closeEditor,
-                      child: const Text('Cancel'),
+                      child: Text(l10n.cancel),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -323,7 +327,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Save profile'),
+                          : Text(l10n.saveProfile),
                     ),
                   ),
                 ],

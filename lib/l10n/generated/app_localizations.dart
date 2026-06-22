@@ -717,6 +717,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not confirm this shift. Please try again.'**
   String get shiftConfirmationFailed;
+
+  /// No description provided for @inbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Inbox'**
+  String get inbox;
+
+  /// No description provided for @unreadWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread {count}'**
+  String unreadWithCount(int count);
+
+  /// No description provided for @sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get sent;
+
+  /// No description provided for @subject.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject'**
+  String get subject;
+
+  /// No description provided for @audience.
+  ///
+  /// In en, this message translates to:
+  /// **'Audience'**
+  String get audience;
+
+  /// No description provided for @message.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get message;
+
+  /// No description provided for @managers.
+  ///
+  /// In en, this message translates to:
+  /// **'Managers'**
+  String get managers;
+
+  /// No description provided for @contacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Contacts'**
+  String get contacts;
+
+  /// No description provided for @writeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Write message'**
+  String get writeMessage;
+
+  /// No description provided for @whatIsThisAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'What is this about?'**
+  String get whatIsThisAbout;
+
+  /// No description provided for @sendDirectlyToManagers.
+  ///
+  /// In en, this message translates to:
+  /// **'Send directly to your managers.'**
+  String get sendDirectlyToManagers;
+
+  /// No description provided for @writeYourMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Write your message...'**
+  String get writeYourMessage;
+
+  /// No description provided for @sendPrivateText.
+  ///
+  /// In en, this message translates to:
+  /// **'Send private text'**
+  String get sendPrivateText;
+
+  /// No description provided for @noMessagesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet'**
+  String get noMessagesYet;
+
+  /// No description provided for @noUnreadMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'No unread messages'**
+  String get noUnreadMessages;
+
+  /// No description provided for @noSentMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'No sent messages'**
+  String get noSentMessages;
+
+  /// No description provided for @you.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get you;
+
+  /// No description provided for @sentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent message'**
+  String get sentMessage;
+
+  /// No description provided for @messageFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Message from {name}'**
+  String messageFrom(String name);
+
+  /// No description provided for @reply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get reply;
+
+  /// No description provided for @comment.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get comment;
+
+  /// No description provided for @editProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get editProfile;
+
+  /// No description provided for @chooseFromGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get chooseFromGallery;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// No description provided for @firstName.
+  ///
+  /// In en, this message translates to:
+  /// **'First name'**
+  String get firstName;
+
+  /// No description provided for @lastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Last name'**
+  String get lastName;
+
+  /// No description provided for @phoneNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get phoneNumber;
+
+  /// No description provided for @jobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Job title'**
+  String get jobTitle;
+
+  /// No description provided for @extraInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra information'**
+  String get extraInformation;
+
+  /// No description provided for @workplaceManagesExtraInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency contact, certificates, and employment notes are managed by your workplace.'**
+  String get workplaceManagesExtraInfo;
+
+  /// No description provided for @saveProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Save profile'**
+  String get saveProfile;
+
+  /// No description provided for @profileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile saved.'**
+  String get profileSaved;
+
+  /// No description provided for @profileSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save profile. Please try again.'**
+  String get profileSaveFailed;
+
+  /// No description provided for @validProfileRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add first name, last name, and a valid email.'**
+  String get validProfileRequired;
+
+  /// No description provided for @imageTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Image is too large. Choose a smaller photo.'**
+  String get imageTooLarge;
+
+  /// No description provided for @imagePickFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not pick image. Please try again.'**
+  String get imagePickFailed;
 }
 
 class _AppLocalizationsDelegate

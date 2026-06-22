@@ -90,8 +90,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                                 Expanded(
                                   child: Text(
                                     l10n.shiftsFor(
-                                      DateFormat('EEE d MMM', locale)
-                                          .format(selectedDate),
+                                      _scheduleDateLabel(selectedDate, locale),
                                     ),
                                     style: AppTypography.headingMedium,
                                   ),
@@ -227,7 +226,7 @@ class _DayPill extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              DateFormat('EEE', locale).format(date),
+              _localizedWeekdayShort(date, locale),
               style: AppTypography.caption.copyWith(
                 color:
                     isSelected ? AppColors.cardBackground : AppColors.mutedText,
@@ -370,7 +369,7 @@ class _ScheduleShiftTile extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    DateFormat('EEE', locale).format(shift.startsAt),
+                    _localizedWeekdayShort(shift.startsAt, locale),
                     style: AppTypography.caption.copyWith(
                       color: statusColor,
                       fontWeight: FontWeight.w900,
@@ -519,8 +518,7 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
             _DetailRow(
               icon: Icons.calendar_today_outlined,
               label: l10n.date,
-              value: DateFormat('EEEE, d MMM', locale)
-                  .format(widget.shift.startsAt),
+              value: _scheduleLongDateLabel(widget.shift.startsAt, locale),
             ),
             _DetailRow(
               icon: Icons.access_time_rounded,
@@ -727,6 +725,55 @@ String _time(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+String _localizedWeekdayShort(DateTime date, String locale) {
+  if (locale != 'so') return DateFormat('EEE', locale).format(date);
+  const labels = ['Isn', 'Tal', 'Arb', 'Kha', 'Jim', 'Sab', 'Axd'];
+  return labels[date.weekday - 1];
+}
+
+String _localizedWeekdayLong(DateTime date, String locale) {
+  if (locale != 'so') return DateFormat('EEEE', locale).format(date);
+  const labels = [
+    'Isniin',
+    'Talaado',
+    'Arbaco',
+    'Khamiis',
+    'Jimco',
+    'Sabti',
+    'Axad',
+  ];
+  return labels[date.weekday - 1];
+}
+
+String _localizedMonthShort(DateTime date, String locale) {
+  if (locale != 'so') return DateFormat('MMM', locale).format(date);
+  const labels = [
+    'Jan',
+    'Feb',
+    'Maar',
+    'Abr',
+    'May',
+    'Juun',
+    'Luul',
+    'Ago',
+    'Seb',
+    'Okt',
+    'Nof',
+    'Dis',
+  ];
+  return labels[date.month - 1];
+}
+
+String _scheduleDateLabel(DateTime date, String locale) {
+  return '${_localizedWeekdayShort(date, locale)} ${date.day} '
+      '${_localizedMonthShort(date, locale)}';
+}
+
+String _scheduleLongDateLabel(DateTime date, String locale) {
+  return '${_localizedWeekdayLong(date, locale)}, ${date.day} '
+      '${_localizedMonthShort(date, locale)}';
 }
 
 DateTime _startOfDay(DateTime date) {
