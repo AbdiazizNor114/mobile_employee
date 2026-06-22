@@ -124,6 +124,15 @@ void main() {
         status: ShiftStatus.confirmed,
         workConfirmationRequired: true,
       ),
+      Shift(
+        id: 'future-shift',
+        role: 'Future shift',
+        location: 'HQ',
+        startsAt: DateTime.now().add(const Duration(days: 2)),
+        endsAt: DateTime.now().add(const Duration(days: 2, hours: 8)),
+        status: ShiftStatus.confirmed,
+        workConfirmationRequired: true,
+      ),
     ]);
     await tester.pumpAndSettle();
 
@@ -132,6 +141,11 @@ void main() {
 
     expect(find.text('Awaiting confirmation'), findsOneWidget);
     expect(find.text('Confirm worked'), findsOneWidget);
+    expect(find.text('Scheduled'), findsOneWidget);
     expect(find.textContaining('1 completed shift is waiting'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Awaiting confirmation')).dy,
+      lessThan(tester.getTopLeft(find.text('Scheduled')).dy),
+    );
   });
 }

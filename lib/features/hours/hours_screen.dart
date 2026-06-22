@@ -55,8 +55,7 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
       );
       return !date.isBefore(_selectedRange.start) &&
           !date.isAfter(_selectedRange.end);
-    }).toList()
-      ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
+    }).toList();
     final totalHours = visibleDays.fold<double>(
       0,
       (total, day) => total + day.hours,
@@ -73,6 +72,15 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
     final hasShiftConfirmation =
         companyPlan == 'pro' || companyPlan == 'enterprise';
     final now = DateTime.now();
+    visibleShifts.sort((a, b) {
+      final priorityA = _historyPriority(a, now, hasShiftConfirmation);
+      final priorityB = _historyPriority(b, now, hasShiftConfirmation);
+      if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+      if (!a.hasEnded(now) && !b.hasEnded(now)) {
+        return a.startsAt.compareTo(b.startsAt);
+      }
+      return b.startsAt.compareTo(a.startsAt);
+    });
     final pendingShifts = hasShiftConfirmation
         ? shifts.where((shift) => shift.canConfirmWork(now)).toList()
         : <Shift>[]
@@ -520,6 +528,20 @@ _ConfirmationVisualState _confirmationState(
   }
   if (shift.canConfirmWork(now)) return _ConfirmationVisualState.pending;
   return _ConfirmationVisualState.neutral;
+}
+
+int _historyPriority(
+  Shift shift,
+  DateTime now,
+  bool confirmationEnabled,
+) {
+  return switch (_confirmationState(shift, now, confirmationEnabled)) {
+    _ConfirmationVisualState.pending => 0,
+    _ConfirmationVisualState.overdue => 1,
+    _ConfirmationVisualState.confirmed => 2,
+    _ConfirmationVisualState.absent => 3,
+    _ConfirmationVisualState.neutral => shift.hasEnded(now) ? 4 : 5,
+  };
 }
 
 DateTimeRange _normalizeRange(DateTime start, DateTime end) {
