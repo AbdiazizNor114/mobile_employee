@@ -933,6 +933,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not pick image. Please try again.'**
   String get imagePickFailed;
+
+  /// No description provided for @awaitingConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting confirmation'**
+  String get awaitingConfirmation;
+
+  /// No description provided for @confirmationOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation overdue'**
+  String get confirmationOverdue;
+
+  /// No description provided for @scheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get scheduled;
+
+  /// No description provided for @absent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get absent;
+
+  /// No description provided for @confirmBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm by {date}'**
+  String confirmBy(String date);
+
+  /// No description provided for @managerReviewRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager review required'**
+  String get managerReviewRequired;
+
+  /// No description provided for @aiPendingConfirmationReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insight: {count, plural, =1{1 completed shift is} other{{count} completed shifts are}} waiting for confirmation. The oldest must be confirmed {days, plural, =0{today} =1{within 1 day} other{within {days} days}}.'**
+  String aiPendingConfirmationReminder(int count, int days);
 }
 
 class _AppLocalizationsDelegate

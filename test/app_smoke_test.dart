@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shaqonet_employee/core/models/shift.dart';
+import 'package:shaqonet_employee/core/providers/mock_work_provider.dart';
 import 'package:shaqonet_employee/core/providers/service_providers.dart';
 import 'package:shaqonet_employee/main.dart';
 
@@ -81,5 +83,55 @@ void main() {
 
     expect(find.text('Toddobaadkan'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps yesterday shift available for confirmation in Hours', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appBootstrapProvider.overrideWith((ref) async {}),
+          currentSessionProvider.overrideWith((ref) => true),
+        ],
+        child: const ShaqoNetEmployeeBootstrap(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ShaqoNetEmployeeBootstrap)),
+    );
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    container.read(companyPlanProvider.notifier).state = 'pro';
+    container.read(shiftsProvider.notifier).replaceAll([
+      Shift(
+        id: 'yesterday-shift',
+        role: 'Receptionist',
+        location: 'HQ',
+        startsAt: DateTime(
+          yesterday.year,
+          yesterday.month,
+          yesterday.day,
+          8,
+        ),
+        endsAt: DateTime(
+          yesterday.year,
+          yesterday.month,
+          yesterday.day,
+          16,
+        ),
+        status: ShiftStatus.confirmed,
+        workConfirmationRequired: true,
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Hours'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Awaiting confirmation'), findsOneWidget);
+    expect(find.text('Confirm worked'), findsOneWidget);
+    expect(find.textContaining('1 completed shift is waiting'), findsOneWidget);
   });
 }

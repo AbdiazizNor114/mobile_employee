@@ -917,6 +917,7 @@ class _InformationTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -941,7 +942,7 @@ class _InformationTab extends StatelessWidget {
                   children: [
                     Text(
                       profile.fullName.isEmpty
-                          ? 'Employee profile'
+                          ? l10n.profile
                           : profile.fullName,
                       style: AppTypography.headingMedium,
                     ),
@@ -959,23 +960,20 @@ class _InformationTab extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           _InfoRow(
             icon: Icons.mail_outline_rounded,
-            label: 'Email',
-            value: _fallback(profile.email),
+            label: l10n.email,
+            value: profile.email.isEmpty ? l10n.notProvided : profile.email,
           ),
           _InfoRow(
             icon: Icons.phone_outlined,
-            label: 'Phone',
-            value: _fallback(profile.phoneNumber),
-          ),
-          _InfoRow(
-            icon: Icons.badge_outlined,
-            label: 'Company role',
-            value: profile.companyRoleLabel,
+            label: l10n.phone,
+            value: profile.phoneNumber.isEmpty
+                ? l10n.notProvided
+                : profile.phoneNumber,
           ),
           _InfoRow(
             icon: Icons.work_outline_rounded,
-            label: 'Job title',
-            value: _fallback(profile.jobTitle),
+            label: l10n.jobTitle,
+            value: profile.primaryRole,
           ),
         ],
       ),
@@ -1042,11 +1040,6 @@ String _formatConfirmationDate(DateTime date) {
 
 String _formatShortDate(DateTime date) {
   return '${date.day} ${_monthShort(date)} ${date.year}';
-}
-
-String _fallback(String value) {
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? 'Not added' : trimmed;
 }
 
 String _absenceTypeLabel(AbsenceType type) {

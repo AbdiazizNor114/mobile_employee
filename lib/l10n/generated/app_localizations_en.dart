@@ -483,4 +483,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imagePickFailed => 'Could not pick image. Please try again.';
+
+  @override
+  String get awaitingConfirmation => 'Awaiting confirmation';
+
+  @override
+  String get confirmationOverdue => 'Confirmation overdue';
+
+  @override
+  String get scheduled => 'Scheduled';
+
+  @override
+  String get absent => 'Absent';
+
+  @override
+  String confirmBy(String date) {
+    return 'Confirm by $date';
+  }
+
+  @override
+  String get managerReviewRequired => 'Manager review required';
+
+  @override
+  String aiPendingConfirmationReminder(int count, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count completed shifts are',
+      one: '1 completed shift is',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'within $days days',
+      one: 'within 1 day',
+      zero: 'today',
+    );
+    return 'AI insight: $_temp0 waiting for confirmation. The oldest must be confirmed $_temp1.';
+  }
 }

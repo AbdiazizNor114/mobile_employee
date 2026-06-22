@@ -89,9 +89,9 @@ class AccountScreen extends ConsumerWidget {
                           ),
                           const Divider(height: AppSpacing.lg),
                           _ProfileInfoRow(
-                            icon: Icons.badge_outlined,
-                            label: l10n.role,
-                            value: profile.companyRoleLabel,
+                            icon: Icons.work_outline_rounded,
+                            label: l10n.jobTitle,
+                            value: profile.primaryRole,
                           ),
                           const Divider(height: AppSpacing.lg),
                           _ProfileInfoRow(

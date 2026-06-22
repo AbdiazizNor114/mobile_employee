@@ -488,4 +488,42 @@ class AppLocalizationsSo extends AppLocalizations {
   @override
   String get imagePickFailed =>
       'Sawirka lama dooran karin. Fadlan mar kale isku day.';
+
+  @override
+  String get awaitingConfirmation => 'Xaqiijin sugaysa';
+
+  @override
+  String get confirmationOverdue => 'Xaqiijintu way daahday';
+
+  @override
+  String get scheduled => 'La qorsheeyay';
+
+  @override
+  String get absent => 'Maqnaa';
+
+  @override
+  String confirmBy(String date) {
+    return 'Xaqiiji ka hor $date';
+  }
+
+  @override
+  String get managerReviewRequired => 'Maamuluhu waa inuu hubiyaa';
+
+  @override
+  String aiPendingConfirmationReminder(int count, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shaqo oo dhammaatay ayaa',
+      one: '1 shaqo oo dhammaatay ayaa',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days maalmood gudahood',
+      one: '1 maalin gudaheed',
+      zero: 'maanta',
+    );
+    return 'Talo shaqo: $_temp0 sugaysa xaqiijin. Shaqada ugu horreysa waa in la xaqiijiyaa $_temp1.';
+  }
 }

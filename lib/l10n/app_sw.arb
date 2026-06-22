@@ -152,5 +152,14 @@
   "profileSaveFailed": "Wasifu haukuweza kuhifadhiwa. Tafadhali jaribu tena.",
   "validProfileRequired": "Weka jina la kwanza, jina la mwisho na barua pepe sahihi.",
   "imageTooLarge": "Picha ni kubwa sana. Chagua picha ndogo zaidi.",
-  "imagePickFailed": "Picha haikuweza kuchaguliwa. Tafadhali jaribu tena."
+  "imagePickFailed": "Picha haikuweza kuchaguliwa. Tafadhali jaribu tena.",
+  "awaitingConfirmation": "Inasubiri uthibitisho",
+  "confirmationOverdue": "Uthibitisho umechelewa",
+  "scheduled": "Imepangwa",
+  "absent": "Hakuwepo",
+  "confirmBy": "Thibitisha kabla ya {date}",
+  "@confirmBy": {"placeholders": {"date": {"type": "String"}}},
+  "managerReviewRequired": "Msimamizi anapaswa kukagua",
+  "aiPendingConfirmationReminder": "Ushauri wa kazi: {count, plural, =1{Zamu moja iliyokamilika inasubiri} other{Zamu {count} zilizokamilika zinasubiri}} uthibitisho. Zamu ya kwanza lazima ithibitishwe {days, plural, =0{leo} =1{ndani ya siku moja} other{ndani ya siku {days}}}.",
+  "@aiPendingConfirmationReminder": {"placeholders": {"count": {"type": "int"}, "days": {"type": "int"}}}
 }

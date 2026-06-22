@@ -152,5 +152,14 @@
   "profileSaveFailed": "Could not save profile. Please try again.",
   "validProfileRequired": "Add first name, last name, and a valid email.",
   "imageTooLarge": "Image is too large. Choose a smaller photo.",
-  "imagePickFailed": "Could not pick image. Please try again."
+  "imagePickFailed": "Could not pick image. Please try again.",
+  "awaitingConfirmation": "Awaiting confirmation",
+  "confirmationOverdue": "Confirmation overdue",
+  "scheduled": "Scheduled",
+  "absent": "Absent",
+  "confirmBy": "Confirm by {date}",
+  "@confirmBy": {"placeholders": {"date": {"type": "String"}}},
+  "managerReviewRequired": "Manager review required",
+  "aiPendingConfirmationReminder": "AI insight: {count, plural, =1{1 completed shift is} other{{count} completed shifts are}} waiting for confirmation. The oldest must be confirmed {days, plural, =0{today} =1{within 1 day} other{within {days} days}}.",
+  "@aiPendingConfirmationReminder": {"placeholders": {"count": {"type": "int"}, "days": {"type": "int"}}}
 }

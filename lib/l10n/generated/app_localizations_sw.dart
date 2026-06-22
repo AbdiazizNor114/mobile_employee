@@ -489,4 +489,42 @@ class AppLocalizationsSw extends AppLocalizations {
   @override
   String get imagePickFailed =>
       'Picha haikuweza kuchaguliwa. Tafadhali jaribu tena.';
+
+  @override
+  String get awaitingConfirmation => 'Inasubiri uthibitisho';
+
+  @override
+  String get confirmationOverdue => 'Uthibitisho umechelewa';
+
+  @override
+  String get scheduled => 'Imepangwa';
+
+  @override
+  String get absent => 'Hakuwepo';
+
+  @override
+  String confirmBy(String date) {
+    return 'Thibitisha kabla ya $date';
+  }
+
+  @override
+  String get managerReviewRequired => 'Msimamizi anapaswa kukagua';
+
+  @override
+  String aiPendingConfirmationReminder(int count, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Zamu $count zilizokamilika zinasubiri',
+      one: 'Zamu moja iliyokamilika inasubiri',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'ndani ya siku $days',
+      one: 'ndani ya siku moja',
+      zero: 'leo',
+    );
+    return 'Ushauri wa kazi: $_temp0 uthibitisho. Zamu ya kwanza lazima ithibitishwe $_temp1.';
+  }
 }

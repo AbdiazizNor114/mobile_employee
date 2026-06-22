@@ -152,5 +152,14 @@
   "profileSaveFailed": "Xogta lama kaydin karin. Fadlan mar kale isku day.",
   "validProfileRequired": "Geli magaca hore, magaca dambe, iyo iimayl sax ah.",
   "imageTooLarge": "Sawirku aad buu u weyn yahay. Dooro sawir ka yar.",
-  "imagePickFailed": "Sawirka lama dooran karin. Fadlan mar kale isku day."
+  "imagePickFailed": "Sawirka lama dooran karin. Fadlan mar kale isku day.",
+  "awaitingConfirmation": "Xaqiijin sugaysa",
+  "confirmationOverdue": "Xaqiijintu way daahday",
+  "scheduled": "La qorsheeyay",
+  "absent": "Maqnaa",
+  "confirmBy": "Xaqiiji ka hor {date}",
+  "@confirmBy": {"placeholders": {"date": {"type": "String"}}},
+  "managerReviewRequired": "Maamuluhu waa inuu hubiyaa",
+  "aiPendingConfirmationReminder": "Talo shaqo: {count, plural, =1{1 shaqo oo dhammaatay ayaa} other{{count} shaqo oo dhammaatay ayaa}} sugaysa xaqiijin. Shaqada ugu horreysa waa in la xaqiijiyaa {days, plural, =0{maanta} =1{1 maalin gudaheed} other{{days} maalmood gudahood}}.",
+  "@aiPendingConfirmationReminder": {"placeholders": {"count": {"type": "int"}, "days": {"type": "int"}}}
 }
