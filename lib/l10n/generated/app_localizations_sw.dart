@@ -28,6 +28,49 @@ class AppLocalizationsSw extends AppLocalizations {
   String get signIn => 'Ingia';
 
   @override
+  String get signingIn => 'Inaingia...';
+
+  @override
+  String get forgotPassword => 'Umesahau nenosiri?';
+
+  @override
+  String get validEmailRequired => 'Tafadhali weka barua pepe sahihi.';
+
+  @override
+  String get passwordMinLength => 'Nenosiri lazima liwe na angalau herufi 6.';
+
+  @override
+  String get signInGenericError =>
+      'Haikuweza kuingia. Angalia barua pepe na nenosiri lako.';
+
+  @override
+  String get serverUnreachable =>
+      'Seva ya ShaqoNet haikuweza kufikiwa. Tafadhali jaribu tena.';
+
+  @override
+  String signInFailedWithStatus(int status) {
+    return 'Kuingia kumeshindikana ($status). Tafadhali jaribu tena.';
+  }
+
+  @override
+  String get resetPassword => 'Weka upya nenosiri';
+
+  @override
+  String get resetPasswordHelp =>
+      'Weka barua pepe ya akaunti yako nasi tutakutumia kiungo salama cha kuweka upya.';
+
+  @override
+  String get sendResetLink => 'Tuma kiungo cha kuweka upya';
+
+  @override
+  String get passwordResetSent =>
+      'Barua pepe ya kuweka upya nenosiri imetumwa. Angalia kikasha chako.';
+
+  @override
+  String get passwordResetFailed =>
+      'Haikuweza kutuma barua pepe ya kuweka upya. Jaribu tena.';
+
+  @override
   String get demoMode => 'Hali ya majaribio';
 
   @override
@@ -178,6 +221,9 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get duration => 'Muda wa zamu';
+
+  @override
+  String get location => 'Mahali';
 
   @override
   String get notes => 'Maelezo';
@@ -339,6 +385,9 @@ class AppLocalizationsSw extends AppLocalizations {
   String get noUpcomingShifts => 'Bado hakuna zamu zijazo';
 
   @override
+  String get noShiftsRightNow => 'Hakuna zamu kwa sasa';
+
+  @override
   String get shiftConfirmations => 'Uthibitisho wa zamu';
 
   @override
@@ -362,6 +411,14 @@ class AppLocalizationsSw extends AppLocalizations {
   @override
   String get confirmAttestation =>
       'Ninathibitisha kuwa nilifanya zamu hii kama ilivyopangwa.';
+
+  @override
+  String shiftId(String id) {
+    return 'Kitambulisho cha zamu $id';
+  }
+
+  @override
+  String get shiftIdLabel => 'Kitambulisho cha zamu';
 
   @override
   String get cancel => 'Ghairi';
@@ -400,6 +457,9 @@ class AppLocalizationsSw extends AppLocalizations {
   String get contacts => 'Mawasiliano';
 
   @override
+  String get noManagerContactsYet => 'Bado hakuna mawasiliano ya wasimamizi';
+
+  @override
   String get writeMessage => 'Andika ujumbe';
 
   @override
@@ -410,10 +470,66 @@ class AppLocalizationsSw extends AppLocalizations {
       'Tuma moja kwa moja kwa wasimamizi wako.';
 
   @override
+  String get sendPrivateTextToManagers => 'Tuma ujumbe binafsi kwa wasimamizi.';
+
+  @override
   String get writeYourMessage => 'Andika ujumbe wako...';
 
   @override
   String get sendPrivateText => 'Tuma ujumbe binafsi';
+
+  @override
+  String get postedToTeamHub => 'Imechapishwa kwenye kitovu cha timu.';
+
+  @override
+  String get messageSentToManager => 'Ujumbe umetumwa kwa msimamizi wako.';
+
+  @override
+  String get couldNotPost =>
+      'Haikuweza kuchapishwa. Sawazisha upya kisha ujaribu tena.';
+
+  @override
+  String get teamUpdatesReadOnly =>
+      'Taarifa za timu ni za kusoma tu kwenye mpango huu.';
+
+  @override
+  String get postHubComment => 'Chapisha maoni ya kitovu';
+
+  @override
+  String get comments => 'Maoni';
+
+  @override
+  String get noCommentsYet =>
+      'Bado hakuna maoni. Ongeza la kwanza ili timu yote ilione.';
+
+  @override
+  String get whatShouldTeamTrack => 'Timu ifuatilie nini?';
+
+  @override
+  String get postEveryoneCanSee => 'Chapisha ili kila mtu aone na kutoa maoni.';
+
+  @override
+  String get hubCommentInfo =>
+      'Maoni haya hubaki kwenye Kitovu cha Timu cha umma ili kila mtu afanye kazi kutoka rekodi ileile.';
+
+  @override
+  String get addHubComment => 'Ongeza maoni ya kitovu kwa timu yako...';
+
+  @override
+  String get postComment => 'Chapisha maoni';
+
+  @override
+  String get postToHub => 'Chapisha kwenye kitovu';
+
+  @override
+  String get noHubPostsYet => 'Bado hakuna machapisho ya kitovu';
+
+  @override
+  String get noHubPostsSubtitle =>
+      'Chapisha taarifa au maoni wakati timu yote inapaswa kuyaona.';
+
+  @override
+  String get teamUpdateFallback => 'Taarifa ya timu';
 
   @override
   String get noMessagesYet => 'Bado hakuna ujumbe';
@@ -440,6 +556,15 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get comment => 'Maoni';
+
+  @override
+  String get activityShiftPublished => 'Zamu imechapishwa';
+
+  @override
+  String get openShiftsThisWeek => 'Zamu wazi za wiki hii';
+
+  @override
+  String get chooseScheduleDate => 'Chagua tarehe ya ratiba';
 
   @override
   String get editProfile => 'Hariri wasifu';
@@ -527,4 +652,93 @@ class AppLocalizationsSw extends AppLocalizations {
     );
     return 'Ushauri wa kazi: $_temp0 uthibitisho. Zamu ya kwanza lazima ithibitishwe $_temp1.';
   }
+
+  @override
+  String get requestAbsence => 'Omba kutokuwepo';
+
+  @override
+  String get absenceRequestHelp =>
+      'Tuma ombi la likizo, ugonjwa, au muda mwingine wa kutokuwepo.';
+
+  @override
+  String pendingAbsenceRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Maombi $count yanasubiri ukaguzi',
+      one: 'Ombi moja linasubiri ukaguzi',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reason => 'Sababu';
+
+  @override
+  String get start => 'Mwanzo';
+
+  @override
+  String get end => 'Mwisho';
+
+  @override
+  String get note => 'Maelezo';
+
+  @override
+  String get optionalManagerMessage => 'Ujumbe wa hiari kwa msimamizi wako';
+
+  @override
+  String get sendRequest => 'Tuma ombi';
+
+  @override
+  String get sending => 'Inatuma...';
+
+  @override
+  String get requests => 'Maombi';
+
+  @override
+  String get noAbsenceRequestsYet => 'Bado hakuna maombi ya kutokuwepo.';
+
+  @override
+  String get endDateAfterStart =>
+      'Tarehe ya mwisho lazima iwe baada ya tarehe ya mwanzo.';
+
+  @override
+  String get absenceRequestSent => 'Ombi la kutokuwepo limetumwa.';
+
+  @override
+  String get absenceRequestsUnavailable =>
+      'Maombi ya kutokuwepo bado hayajapatikana kwa mahali hapa pa kazi.';
+
+  @override
+  String get sessionCannotSendRequest =>
+      'Kipindi chako hakiwezi kutuma ombi hili. Ingia tena na ujaribu.';
+
+  @override
+  String get connectionFailedRetry =>
+      'ShaqoNet haikuweza kufikiwa. Angalia muunganisho wako na ujaribu tena.';
+
+  @override
+  String get absenceRequestFailed =>
+      'Ombi halikuweza kutumwa. Vuta ili usasishe na ujaribu tena.';
+
+  @override
+  String get vacation => 'Likizo';
+
+  @override
+  String get sickLeave => 'Likizo ya ugonjwa';
+
+  @override
+  String get parentalLeave => 'Likizo ya mzazi';
+
+  @override
+  String get otherAbsence => 'Nyingine';
+
+  @override
+  String get pending => 'Inasubiri';
+
+  @override
+  String get approved => 'Imeidhinishwa';
+
+  @override
+  String get denied => 'Imekataliwa';
 }

@@ -255,8 +255,11 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
                         shift: shift,
                         now: now,
                         confirmationEnabled: hasShiftConfirmation,
-                        isConfirming: _confirmingShiftId == shift.id,
-                        onConfirm: () => _confirmShift(shift),
+                        onTap: () => _showShiftDetails(
+                          shift,
+                          now,
+                          hasShiftConfirmation,
+                        ),
                       ),
                       if (shift != visibleShifts.last)
                         const Divider(height: AppSpacing.lg),
@@ -369,10 +372,167 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
       if (mounted) setState(() => _confirmingShiftId = null);
     }
   }
+
+  void _showShiftDetails(
+    Shift shift,
+    DateTime now,
+    bool confirmationEnabled,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => _ShiftHistoryDetailSheet(
+        shift: shift,
+        now: now,
+        confirmationEnabled: confirmationEnabled,
+        isConfirming: _confirmingShiftId == shift.id,
+        onConfirm: () => _confirmShift(shift),
+      ),
+    );
+  }
 }
 
 class _ShiftHistoryRow extends StatelessWidget {
   const _ShiftHistoryRow({
+    required this.shift,
+    required this.now,
+    required this.confirmationEnabled,
+    required this.onTap,
+  });
+
+  final Shift shift;
+  final DateTime now;
+  final bool confirmationEnabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
+    final state = _confirmationState(shift, now, confirmationEnabled);
+    final color = switch (state) {
+      _ConfirmationVisualState.pending => AppColors.orangeHours,
+      _ConfirmationVisualState.confirmed => AppColors.primaryGreen,
+      _ConfirmationVisualState.overdue => AppColors.alertRed,
+      _ConfirmationVisualState.absent => AppColors.mutedText,
+      _ConfirmationVisualState.neutral => AppColors.blueInfo,
+    };
+    final label = switch (state) {
+      _ConfirmationVisualState.pending => l10n.awaitingConfirmation,
+      _ConfirmationVisualState.confirmed => l10n.confirmed,
+      _ConfirmationVisualState.overdue => l10n.confirmationOverdue,
+      _ConfirmationVisualState.absent => l10n.absent,
+      _ConfirmationVisualState.neutral => l10n.scheduled,
+    };
+    final detail = switch (state) {
+      _ConfirmationVisualState.pending => l10n.confirmBy(
+          _localizedShiftDate(shift.workConfirmationDeadline, locale),
+        ),
+      _ConfirmationVisualState.overdue => l10n.managerReviewRequired,
+      _ => '',
+    };
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 5,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      shift.role,
+                      style: AppTypography.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (shift.location.trim().isNotEmpty)
+                      Text(
+                        shift.location,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '${_localizedShiftDate(shift.startsAt, locale)} · '
+                      '${_formatTime(shift.startsAt)} - ${_formatTime(shift.endsAt)} · '
+                      '${_formatHours(_shiftDurationHours(shift))} h',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            label,
+                            style: AppTypography.caption.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (detail.isNotEmpty)
+                          Text(
+                            detail,
+                            style: AppTypography.caption.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.mutedText,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShiftHistoryDetailSheet extends StatelessWidget {
+  const _ShiftHistoryDetailSheet({
     required this.shift,
     required this.now,
     required this.confirmationEnabled,
@@ -405,106 +565,154 @@ class _ShiftHistoryRow extends StatelessWidget {
       _ConfirmationVisualState.absent => l10n.absent,
       _ConfirmationVisualState.neutral => l10n.scheduled,
     };
-    final detail = switch (state) {
-      _ConfirmationVisualState.pending => l10n.confirmBy(
-          _localizedShiftDate(shift.workConfirmationDeadline, locale),
-        ),
-      _ConfirmationVisualState.overdue => l10n.managerReviewRequired,
-      _ => '',
-    };
+    final note = shift.notes.trim();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 5,
-          height: 72,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                shift.role,
-                style: AppTypography.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (shift.location.trim().isNotEmpty)
-                Text(
-                  shift.location,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.mutedText,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 27,
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  child: Icon(
+                    _statusIcon(state),
+                    color: color,
                   ),
                 ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${_localizedShiftDate(shift.startsAt, locale)} · '
-                '${_formatTime(shift.startsAt)} - ${_formatTime(shift.endsAt)} · '
-                '${_formatHours(_shiftDurationHours(shift))} h',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.mutedText,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(shift.role, style: AppTypography.headingMedium),
+                      if (shift.location.trim().isNotEmpty)
+                        Text(
+                          shift.location,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                _statusDetail(l10n, shift, state, locale),
+                style: AppTypography.bodyMedium.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      label,
-                      style: AppTypography.caption.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _HistoryDetailRow(
+              icon: Icons.verified_outlined,
+              text: label,
+              color: color,
+            ),
+            _HistoryDetailRow(
+              icon: Icons.calendar_today_outlined,
+              text: _localizedShiftDate(shift.startsAt, locale),
+            ),
+            _HistoryDetailRow(
+              icon: Icons.schedule,
+              text: '${_formatTime(shift.startsAt)} - '
+                  '${_formatTime(shift.endsAt)}',
+            ),
+            _HistoryDetailRow(
+              icon: Icons.coffee_outlined,
+              text: l10n.hoursAndBreak(
+                _formatHours(_shiftDurationHours(shift)),
+                shift.breakMinutes,
+              ),
+            ),
+            _HistoryDetailRow(
+              icon: Icons.notes_outlined,
+              text: note.isEmpty ? l10n.noManagerNote : note,
+            ),
+            if (state == _ConfirmationVisualState.pending) ...[
+              const SizedBox(height: AppSpacing.lg),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: isConfirming
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          onConfirm();
+                        },
+                  icon: isConfirming
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded),
+                  label: Text(
+                    isConfirming ? l10n.confirming : l10n.confirmWorked,
                   ),
-                  if (detail.isNotEmpty)
-                    Text(
-                      detail,
-                      style: AppTypography.caption.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  if (state == _ConfirmationVisualState.pending)
-                    FilledButton.icon(
-                      onPressed: isConfirming ? null : onConfirm,
-                      icon: isConfirming
-                          ? const SizedBox(
-                              width: 15,
-                              height: 15,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.check_rounded, size: 18),
-                      label: Text(
-                        isConfirming ? l10n.confirming : l10n.confirmWorked,
-                      ),
-                    ),
-                ],
+                ),
               ),
             ],
-          ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _HistoryDetailRow extends StatelessWidget {
+  const _HistoryDetailRow({
+    required this.icon,
+    required this.text,
+    this.color = AppColors.primaryGreen,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(text, style: AppTypography.bodyMedium)),
+        ],
+      ),
     );
   }
 }
@@ -528,6 +736,37 @@ _ConfirmationVisualState _confirmationState(
   }
   if (shift.canConfirmWork(now)) return _ConfirmationVisualState.pending;
   return _ConfirmationVisualState.neutral;
+}
+
+IconData _statusIcon(_ConfirmationVisualState state) {
+  return switch (state) {
+    _ConfirmationVisualState.pending => Icons.pending_actions_rounded,
+    _ConfirmationVisualState.confirmed => Icons.check_circle_rounded,
+    _ConfirmationVisualState.overdue => Icons.error_rounded,
+    _ConfirmationVisualState.absent => Icons.do_not_disturb_on_rounded,
+    _ConfirmationVisualState.neutral => Icons.event_available_rounded,
+  };
+}
+
+String _statusDetail(
+  AppLocalizations l10n,
+  Shift shift,
+  _ConfirmationVisualState state,
+  String locale,
+) {
+  return switch (state) {
+    _ConfirmationVisualState.pending => l10n.confirmBy(
+        _localizedShiftDate(shift.workConfirmationDeadline, locale),
+      ),
+    _ConfirmationVisualState.confirmed => shift.workConfirmedAt == null
+        ? l10n.confirmed
+        : l10n.confirmedOn(
+            _localizedShiftDate(shift.workConfirmedAt!, locale),
+          ),
+    _ConfirmationVisualState.overdue => l10n.managerReviewRequired,
+    _ConfirmationVisualState.absent => l10n.absent,
+    _ConfirmationVisualState.neutral => l10n.scheduled,
+  };
 }
 
 int _historyPriority(

@@ -103,6 +103,8 @@ class AuthService {
 
   bool get hasActiveSession => _storage.readAccessToken() != null;
 
+  String? get accessToken => _storage.readAccessToken();
+
   String? get companyId => _storage.readCompanyId();
 
   String? get membershipId => _storage.readMembershipId();

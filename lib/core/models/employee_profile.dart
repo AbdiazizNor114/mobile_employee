@@ -126,6 +126,21 @@ class StaffContact {
   final String phone;
   final String profilePhotoUrl;
 
+  String get displayName {
+    final trimmedName = name.trim();
+    if (trimmedName.isNotEmpty && trimmedName != email.trim()) {
+      return trimmedName;
+    }
+    if (email.trim().isNotEmpty) return email.trim();
+    return roleLabel;
+  }
+
+  String get subtitle {
+    final title = jobTitle.trim();
+    if (title.isNotEmpty) return title;
+    return roleLabel;
+  }
+
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
     final value = parts.take(2).map((p) => p[0].toUpperCase()).join();

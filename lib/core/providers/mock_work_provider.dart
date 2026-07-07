@@ -371,7 +371,7 @@ class ActivityController extends StateNotifier<List<ActivityItem>> {
   }
 
   void replaceAll(List<ActivityItem> activities) {
-    state = activities;
+    state = [...activities]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     storage.saveActivities(state).then(onCacheUpdated);
   }
 

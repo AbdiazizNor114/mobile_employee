@@ -12,11 +12,25 @@ import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
 import '../../l10n/generated/app_localizations.dart';
 
-enum _MessageFilter { inbox, unread, sent }
+enum _MessageFilter { inbox, unread, sent, contacts }
 
 enum _HubSection { feed, contacts }
 
-enum _ComposeAudience { managers, teamHub }
+enum _ComposeAudience { managers, employees, teamHub }
+
+String _messageTitle(AppMessage message, AppLocalizations l10n) {
+  final subject = message.subject.trim();
+  if (subject.isNotEmpty && subject.toLowerCase() != 'team update') {
+    return subject;
+  }
+  final firstLine = message.content
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .firstOrNull;
+  if (firstLine == null) return l10n.message;
+  return firstLine.length > 72 ? '${firstLine.substring(0, 69)}...' : firstLine;
+}
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -50,6 +64,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             subject: result.subject,
             content: result.content,
             sendToAll: result.audience == _ComposeAudience.teamHub,
+            recipientRole: result.audience == _ComposeAudience.employees
+                ? 'worker'
+                : 'manager',
           );
       await _refreshMessages();
       if (!mounted) return;
@@ -57,16 +74,18 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         SnackBar(
           content: Text(
             result.audience == _ComposeAudience.teamHub
-                ? 'Posted to team hub.'
-                : 'Message sent to your manager.',
+                ? AppLocalizations.of(context).postedToTeamHub
+                : result.audience == _ComposeAudience.managers
+                    ? AppLocalizations.of(context).messageSentToManager
+                    : 'Private message sent to employees.',
           ),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not post. Retry sync and try again.'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).couldNotPost),
         ),
       );
     } finally {
@@ -77,8 +96,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   Future<void> _openComposer(String plan) async {
     if (!_canCompose(plan)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Team updates are read-only on this plan.')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).teamUpdatesReadOnly),
+        ),
       );
       return;
     }
@@ -88,7 +108,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         builder: (context) => _ComposeMessagePage(
           accent: _accentForPlan(plan),
           canUseTeamHub: _canUseTeamHub(plan),
-          defaultToTeamHub: _canUseTeamHub(plan),
+          defaultToTeamHub: false,
         ),
       ),
     );
@@ -177,6 +197,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         _MessageFilter.inbox => !isSent,
         _MessageFilter.unread => !isSent && !message.isRead,
         _MessageFilter.sent => isSent,
+        _MessageFilter.contacts => false,
       };
     }).toList();
 
@@ -239,6 +260,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     accent: accent,
                     onTap: () => setState(() => _filter = _MessageFilter.sent),
                   ),
+                  _MailboxTab(
+                    label: l10n.contacts,
+                    isSelected: _filter == _MessageFilter.contacts,
+                    accent: accent,
+                    onTap: () =>
+                        setState(() => _filter = _MessageFilter.contacts),
+                  ),
                 ],
               ),
             ),
@@ -271,29 +299,32 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                 );
                               },
                             ))
-                  : visibleMessages.isEmpty
-                      ? _NoMessagesView(filter: _filter)
-                      : ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount: visibleMessages.length,
-                          separatorBuilder: (context, index) =>
-                              const Divider(height: 1, color: AppColors.line),
-                          itemBuilder: (context, index) {
-                            final message = visibleMessages[index];
-                            final isSent =
-                                message.senderMemberId == membershipId;
-                            return _MessageRow(
-                              message: message,
-                              isSent: isSent,
-                              accent: accent,
-                              onTap: () => _openMessage(
-                                message: message,
-                                isSent: isSent,
-                                plan: plan,
-                              ),
-                            );
-                          },
-                        ),
+                  : _filter == _MessageFilter.contacts
+                      ? _ContactsList(contacts: contacts, accent: accent)
+                      : visibleMessages.isEmpty
+                          ? _NoMessagesView(filter: _filter)
+                          : ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: visibleMessages.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(
+                                      height: 1, color: AppColors.line),
+                              itemBuilder: (context, index) {
+                                final message = visibleMessages[index];
+                                final isSent =
+                                    message.senderMemberId == membershipId;
+                                return _MessageRow(
+                                  message: message,
+                                  isSent: isSent,
+                                  accent: accent,
+                                  onTap: () => _openMessage(
+                                    message: message,
+                                    isSent: isSent,
+                                    plan: plan,
+                                  ),
+                                );
+                              },
+                            ),
             ),
           ),
         ],
@@ -325,6 +356,8 @@ class _MessagesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       width: double.infinity,
       color: accent,
@@ -362,7 +395,7 @@ class _MessagesHeader extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '$unreadCount unread',
+                      l10n.unreadWithCount(unreadCount),
                       style: AppTypography.caption.copyWith(
                         color: AppColors.cardBackground,
                         fontWeight: FontWeight.w800,
@@ -374,7 +407,7 @@ class _MessagesHeader extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Mark all as read',
+            tooltip: AppLocalizations.of(context).markAllRead,
             onPressed: unreadCount == 0 ? null : onMarkAllRead,
             icon: const Icon(Icons.mark_email_read_outlined),
             color: AppColors.cardBackground,
@@ -382,8 +415,10 @@ class _MessagesHeader extends StatelessWidget {
           ),
           IconButton(
             tooltip: canCompose
-                ? (isHub ? 'Post hub comment' : 'Write message')
-                : 'Team updates are read-only',
+                ? (isHub
+                    ? AppLocalizations.of(context).postHubComment
+                    : AppLocalizations.of(context).writeMessage)
+                : AppLocalizations.of(context).teamUpdatesReadOnly,
             onPressed: isSending ? null : onCompose,
             icon: isSending
                 ? const SizedBox(
@@ -458,7 +493,9 @@ class _MessageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final unread = !isSent && !message.isRead;
+    final photo = profilePhotoProvider(message.senderProfilePhotoUrl);
 
     return Material(
       color: AppColors.cardBackground,
@@ -476,13 +513,16 @@ class _MessageRow extends StatelessWidget {
                 radius: 22,
                 backgroundColor:
                     unread ? accent.withValues(alpha: 0.14) : AppColors.line,
-                child: Text(
-                  _initials(message.senderName),
-                  style: AppTypography.caption.copyWith(
-                    color: unread ? accent : AppColors.darkText,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                backgroundImage: photo,
+                child: photo == null
+                    ? Text(
+                        _initials(message.senderName),
+                        style: AppTypography.caption.copyWith(
+                          color: unread ? accent : AppColors.darkText,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -504,7 +544,7 @@ class _MessageRow extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            message.subject,
+                            _messageTitle(message, l10n),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.bodyLarge.copyWith(
@@ -524,7 +564,7 @@ class _MessageRow extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      isSent ? 'You' : message.senderName,
+                      isSent ? l10n.you : message.senderName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.bodyMedium.copyWith(
@@ -567,7 +607,9 @@ class _HubTopicRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final unread = topic.unreadCount > 0;
+    final photo = profilePhotoProvider(topic.root.senderProfilePhotoUrl);
 
     return Material(
       color: AppColors.cardBackground,
@@ -585,13 +627,16 @@ class _HubTopicRow extends StatelessWidget {
                     backgroundColor: unread
                         ? accent.withValues(alpha: 0.14)
                         : AppColors.line,
-                    child: Text(
-                      _initials(topic.root.senderName),
-                      style: AppTypography.caption.copyWith(
-                        color: unread ? accent : AppColors.darkText,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    backgroundImage: photo,
+                    child: photo == null
+                        ? Text(
+                            _initials(topic.root.senderName),
+                            style: AppTypography.caption.copyWith(
+                              color: unread ? accent : AppColors.darkText,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
@@ -640,7 +685,9 @@ class _HubTopicRow extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                topic.latest.content,
+                topic.latest.id == topic.root.id
+                    ? topic.root.content
+                    : '${topic.latest.senderName}: ${topic.latest.content}',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.bodyMedium.copyWith(
@@ -653,14 +700,13 @@ class _HubTopicRow extends StatelessWidget {
                 children: [
                   _MetaChip(
                     icon: Icons.mode_comment_outlined,
-                    label:
-                        '${topic.commentCount} comment${topic.commentCount == 1 ? '' : 's'}',
+                    label: l10n.comments,
                   ),
                   if (unread) ...[
                     const SizedBox(width: AppSpacing.sm),
                     _MetaChip(
                       icon: Icons.mark_email_unread_outlined,
-                      label: '${topic.unreadCount} unread',
+                      label: l10n.unreadWithCount(topic.unreadCount),
                     ),
                   ],
                   const Spacer(),
@@ -759,8 +805,10 @@ class _ContactsList extends StatelessWidget {
                   size: 42,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text('No manager contacts yet',
-                    style: AppTypography.headingMedium),
+                Text(
+                  AppLocalizations.of(context).noManagerContactsYet,
+                  style: AppTypography.headingMedium,
+                ),
               ],
             ),
           ),
@@ -778,74 +826,301 @@ class _ContactsList extends StatelessWidget {
         final photo = profilePhotoProvider(contact.profilePhotoUrl);
         return Material(
           color: AppColors.cardBackground,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: accent.withValues(alpha: 0.14),
-                  backgroundImage: photo,
-                  child: photo == null
-                      ? Text(
-                          contact.initials,
-                          style: AppTypography.caption.copyWith(
-                            color: accent,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        )
-                      : null,
+          child: InkWell(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => _ContactDetailPage(
+                  contact: contact,
+                  accent: accent,
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        contact.name.isEmpty ? contact.roleLabel : contact.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodyLarge.copyWith(
-                          color: AppColors.darkText,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        [
-                          contact.roleLabel,
-                          if (contact.jobTitle.trim().isNotEmpty)
-                            contact.jobTitle,
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.mutedText,
-                        ),
-                      ),
-                      if (contact.email.trim().isNotEmpty ||
-                          contact.phone.trim().isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.xs),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: accent.withValues(alpha: 0.14),
+                    backgroundImage: photo,
+                    child: photo == null
+                        ? Text(
+                            contact.initials,
+                            style: AppTypography.caption.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          [
-                            if (contact.email.trim().isNotEmpty) contact.email,
-                            if (contact.phone.trim().isNotEmpty) contact.phone,
-                          ].join(' · '),
+                          contact.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.caption.copyWith(
+                          style: AppTypography.bodyLarge.copyWith(
+                            color: AppColors.darkText,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          contact.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodyMedium.copyWith(
                             color: AppColors.mutedText,
                           ),
                         ),
+                        if (contact.email.trim().isNotEmpty ||
+                            contact.phone.trim().isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            [
+                              if (contact.email.trim().isNotEmpty)
+                                contact.email,
+                              if (contact.phone.trim().isNotEmpty)
+                                contact.phone,
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.mutedText,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppSpacing.sm),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.mutedText,
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _ContactDetailPage extends ConsumerWidget {
+  const _ContactDetailPage({
+    required this.contact,
+    required this.accent,
+  });
+
+  final StaffContact contact;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final companyName = ref.watch(companyNameProvider);
+    final photo = profilePhotoProvider(contact.profilePhotoUrl);
+    final companyLabel = companyName.trim().isEmpty
+        ? 'YOUR COMPANY'
+        : companyName.trim().toUpperCase();
+    final groupLine = [
+      if (companyName.trim().isNotEmpty) companyName.trim(),
+      contact.roleLabel,
+    ].join(' / ');
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: accent,
+        foregroundColor: AppColors.cardBackground,
+        title: const Text('Contact'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.xl,
+          AppSpacing.lg,
+          AppSpacing.xl,
+        ),
+        children: [
+          Text(
+            'CONTACTS AT $companyLabel',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.mutedText,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl,
+                  vertical: AppSpacing.xl,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0F000000),
+                      blurRadius: 14,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircleAvatar(
+                          radius: 64,
+                          backgroundColor: accent.withValues(alpha: 0.14),
+                          backgroundImage: photo,
+                          child: photo == null
+                              ? Text(
+                                  contact.initials,
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 28,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.cardBackground,
+                                width: 4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      contact.displayName,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.headingLarge.copyWith(
+                        color: accent,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      contact.subtitle,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.mutedText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      groupLine,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (contact.email.trim().isNotEmpty)
+            _ContactDetailRow(
+              icon: Icons.mail_outline_rounded,
+              label: 'Email',
+              value: contact.email.trim(),
+              accent: accent,
+            ),
+          if (contact.phone.trim().isNotEmpty)
+            _ContactDetailRow(
+              icon: Icons.phone_outlined,
+              label: 'Phone',
+              value: contact.phone.trim(),
+              accent: accent,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContactDetailRow extends StatelessWidget {
+  const _ContactDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: accent),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.mutedText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.darkText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -899,7 +1174,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
           _ThreadMessageCard(
             message: widget.message,
             accent: widget.accent,
-            title: widget.message.subject,
+            title: _messageTitle(widget.message, l10n),
             authorLabel: widget.isSent ? l10n.you : widget.message.senderName,
             onReact: (emoji) => ref
                 .read(messagesProvider.notifier)
@@ -909,7 +1184,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
           if (widget.canUseTeamHub) ...[
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'Comments',
+              l10n.comments,
               style: AppTypography.headingSmall.copyWith(
                 color: AppColors.darkText,
               ),
@@ -924,7 +1199,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                   border: Border.all(color: AppColors.line),
                 ),
                 child: Text(
-                  'No comments yet. Add the first one so the whole team can see it.',
+                  l10n.noCommentsYet,
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.mutedText,
                   ),
@@ -960,7 +1235,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                             canUseTeamHub: widget.canUseTeamHub,
                             hubOnly: widget.canUseTeamHub,
                             initialSubject:
-                                'Re: ${_rootSubject(widget.message.subject)}',
+                                'Re: ${_rootSubject(widget.message)}',
                           ),
                         ),
                       );
@@ -998,6 +1273,8 @@ class _ThreadMessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final photo = profilePhotoProvider(message.senderProfilePhotoUrl);
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -1022,13 +1299,16 @@ class _ThreadMessageCard extends StatelessWidget {
               CircleAvatar(
                 radius: elevated ? 24 : 20,
                 backgroundColor: accent.withValues(alpha: 0.14),
-                child: Text(
-                  _initials(authorLabel),
-                  style: AppTypography.caption.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                backgroundImage: photo,
+                child: photo == null
+                    ? Text(
+                        _initials(authorLabel),
+                        style: AppTypography.caption.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -1172,7 +1452,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
         backgroundColor: widget.accent,
         foregroundColor: AppColors.cardBackground,
         title: Text(widget.hubOnly
-            ? 'Post hub comment'
+            ? l10n.postHubComment
             : widget.canUseTeamHub
                 ? l10n.writeMessage
                 : l10n.writeMessage),
@@ -1194,7 +1474,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               hintText: widget.hubOnly
-                  ? 'What should the team track?'
+                  ? l10n.whatShouldTeamTrack
                   : l10n.whatIsThisAbout,
               filled: true,
               fillColor: AppColors.cardBackground,
@@ -1207,7 +1487,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             _AudienceOption(
               title: l10n.managers,
               subtitle: widget.canUseTeamHub
-                  ? 'Send a private text to managers.'
+                  ? l10n.sendPrivateTextToManagers
                   : l10n.sendDirectlyToManagers,
               value: _ComposeAudience.managers,
               groupValue: _audience,
@@ -1216,8 +1496,17 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             ),
             if (widget.canUseTeamHub)
               _AudienceOption(
+                title: 'Employees',
+                subtitle: 'Send a private text to employees.',
+                value: _ComposeAudience.employees,
+                groupValue: _audience,
+                accent: widget.accent,
+                onChanged: (value) => setState(() => _audience = value),
+              ),
+            if (widget.canUseTeamHub)
+              _AudienceOption(
                 title: l10n.hub,
-                subtitle: 'Post so everyone can see and comment.',
+                subtitle: l10n.postEveryoneCanSee,
                 value: _ComposeAudience.teamHub,
                 groupValue: _audience,
                 accent: widget.accent,
@@ -1233,7 +1522,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                 border: Border.all(color: AppColors.line),
               ),
               child: Text(
-                'This comment stays in the public Team Hub thread so everyone works from the same record.',
+                l10n.hubCommentInfo,
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.mutedText,
                 ),
@@ -1250,9 +1539,8 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             maxLines: 12,
             maxLength: 2000,
             decoration: InputDecoration(
-              hintText: widget.hubOnly
-                  ? 'Add a hub comment for your team...'
-                  : l10n.writeYourMessage,
+              hintText:
+                  widget.hubOnly ? l10n.addHubComment : l10n.writeYourMessage,
               filled: true,
               fillColor: AppColors.cardBackground,
             ),
@@ -1263,9 +1551,9 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             icon: Icon(
                 widget.hubOnly ? Icons.forum_outlined : Icons.send_rounded),
             label: Text(widget.hubOnly
-                ? 'Post comment'
+                ? l10n.postComment
                 : _audience == _ComposeAudience.teamHub
-                    ? 'Post to hub'
+                    ? l10n.postToHub
                     : l10n.sendPrivateText),
           ),
         ],
@@ -1376,6 +1664,7 @@ class _NoMessagesView extends StatelessWidget {
       _MessageFilter.inbox => l10n.noMessagesYet,
       _MessageFilter.unread => l10n.noUnreadMessages,
       _MessageFilter.sent => l10n.noSentMessages,
+      _MessageFilter.contacts => l10n.noManagerContactsYet,
     };
 
     return ListView(
@@ -1404,6 +1693,8 @@ class _EmptyHubView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return ListView(
       children: [
         Padding(
@@ -1416,10 +1707,10 @@ class _EmptyHubView extends StatelessWidget {
                 size: 42,
               ),
               const SizedBox(height: AppSpacing.md),
-              Text('No hub posts yet', style: AppTypography.headingMedium),
+              Text(l10n.noHubPostsYet, style: AppTypography.headingMedium),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Post an update or comment when the whole team should see it.',
+                l10n.noHubPostsSubtitle,
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.mutedText,
@@ -1459,7 +1750,7 @@ List<_HubTopic> _buildHubTopics(
 ) {
   final grouped = <String, List<AppMessage>>{};
   for (final message in messages) {
-    final key = _topicKey(message.subject);
+    final key = _topicKey(message);
     grouped.putIfAbsent(key, () => []).add(message);
   }
 
@@ -1476,7 +1767,7 @@ List<_HubTopic> _buildHubTopics(
     ];
     return _HubTopic(
       key: entry.key,
-      title: _rootSubject(root.subject),
+      title: _rootSubject(root),
       root: root,
       comments: comments,
       unreadCount: comments
@@ -1490,16 +1781,29 @@ List<_HubTopic> _buildHubTopics(
   return topics;
 }
 
-String _topicKey(String subject) {
-  return _rootSubject(subject).toLowerCase().trim();
+String _topicKey(AppMessage message) {
+  final subject = _rootSubject(message).toLowerCase().trim();
+  if (subject.isNotEmpty) return subject;
+  final firstLine = message.content
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .firstOrNull;
+  return '${message.id}:${firstLine ?? message.content}'.toLowerCase();
 }
 
-String _rootSubject(String subject) {
-  var value = subject.trim();
+String _rootSubject(AppMessage message) {
+  var value = message.subject.trim();
   while (value.toLowerCase().startsWith('re:')) {
     value = value.substring(3).trim();
   }
-  return value.isEmpty ? 'Team update' : value;
+  if (value.isNotEmpty && value.toLowerCase() != 'team update') return value;
+  final firstLine = message.content
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .firstOrNull;
+  return firstLine ?? '';
 }
 
 bool _isReplySubject(String subject) {

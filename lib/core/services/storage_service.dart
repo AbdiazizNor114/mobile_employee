@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/absence_request.dart';
 import '../models/activity_item.dart';
@@ -26,11 +27,17 @@ class StorageService {
   static const _timeEntriesKey = 'time_entries';
 
   Box<dynamic>? _box;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
   final Map<String, Object?> _memoryFallback = {};
+  final Map<String, String?> _secureAuthCache = {};
 
   Future<void> initialize() async {
     await Hive.initFlutter();
     _box = await Hive.openBox<dynamic>(_boxName);
+    await _loadSecureAuthValue(_accessTokenKey);
+    await _loadSecureAuthValue(_refreshTokenKey);
   }
 
   EmployeeProfile? readProfile() {
@@ -94,21 +101,21 @@ class StorageService {
   }
 
   String? readAccessToken() {
-    final value = _read(_accessTokenKey);
+    final value = _readSecureAuthValue(_accessTokenKey);
     return value is String && value.trim().isNotEmpty ? value : null;
   }
 
   Future<void> saveAccessToken(String token) async {
-    await _write(_accessTokenKey, token);
+    await _writeSecureAuthValue(_accessTokenKey, token);
   }
 
   String? readRefreshToken() {
-    final value = _read(_refreshTokenKey);
+    final value = _readSecureAuthValue(_refreshTokenKey);
     return value is String && value.trim().isNotEmpty ? value : null;
   }
 
   Future<void> saveRefreshToken(String token) async {
-    await _write(_refreshTokenKey, token);
+    await _writeSecureAuthValue(_refreshTokenKey, token);
   }
 
   String? readCompanyId() {
@@ -237,8 +244,8 @@ class StorageService {
   }
 
   Future<void> clearAuthSession() async {
-    await _write(_accessTokenKey, null);
-    await _write(_refreshTokenKey, null);
+    await _writeSecureAuthValue(_accessTokenKey, null);
+    await _writeSecureAuthValue(_refreshTokenKey, null);
     await _write(_companyIdKey, null);
     await _write(_membershipIdKey, null);
     await _write(_userIdKey, null);
@@ -256,6 +263,39 @@ class StorageService {
     await _write(_absenceRequestsKey, null);
     await _write(_timeEntriesKey, null);
     await _write(_lastUpdatedKey, null);
+  }
+
+  Future<void> _loadSecureAuthValue(String key) async {
+    var value = await _secureStorage.read(key: key);
+
+    if (value == null || value.trim().isEmpty) {
+      final legacyValue = _read(key);
+      if (legacyValue is String && legacyValue.trim().isNotEmpty) {
+        value = legacyValue;
+        await _secureStorage.write(key: key, value: legacyValue);
+      }
+    }
+
+    _secureAuthCache[key] = value;
+    await _write(key, null);
+  }
+
+  String? _readSecureAuthValue(String key) {
+    final value = _secureAuthCache[key];
+    if (value is String && value.trim().isNotEmpty) return value;
+    return null;
+  }
+
+  Future<void> _writeSecureAuthValue(String key, String? value) async {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      await _secureStorage.delete(key: key);
+      _secureAuthCache[key] = null;
+    } else {
+      await _secureStorage.write(key: key, value: normalized);
+      _secureAuthCache[key] = normalized;
+    }
+    await _write(key, null);
   }
 
   Object? _read(String key) {

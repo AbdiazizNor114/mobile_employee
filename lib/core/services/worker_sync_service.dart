@@ -227,6 +227,7 @@ class WorkerSyncService {
     required String subject,
     required String content,
     bool sendToAll = false,
+    String recipientRole = 'manager',
   }) async {
     final companyId = _authService.companyId;
     if (companyId == null) {
@@ -238,7 +239,7 @@ class WorkerSyncService {
       data: {
         'subject': subject.trim().isEmpty ? 'Worker message' : subject.trim(),
         'content': content,
-        if (sendToAll) 'sendToAll': true else 'recipientRole': 'manager',
+        if (sendToAll) 'sendToAll': true else 'recipientRole': recipientRole,
       },
     );
   }
@@ -311,6 +312,9 @@ class WorkerSyncService {
         );
     final membershipPhoto =
         (companyMembership['profile_photo_url'] as String?) ?? '';
+    final employeePhoto = (employee['profile_photo_url'] as String?) ??
+        (profile['profile_photo_url'] as String?) ??
+        '';
     final membershipJobTitle =
         (companyMembership['job_title'] as String?) ?? '';
     return EmployeeProfile(
@@ -324,7 +328,8 @@ class WorkerSyncService {
           ? employeeJobTitle
           : membershipJobTitle,
       companyRole: role,
-      profilePhotoUrl: membershipPhoto,
+      profilePhotoUrl:
+          membershipPhoto.trim().isNotEmpty ? membershipPhoto : employeePhoto,
       preferredLanguage: (employee['preferred_language'] ??
           profile['preferred_language'] ??
           'en') as String,
@@ -444,7 +449,12 @@ class WorkerSyncService {
   }
 
   ActivityItem _mapActivity(Map raw) {
-    final createdAt = DateTime.tryParse((raw['createdAt'] as String?) ?? '') ??
+    final createdAt = DateTime.tryParse(
+          (raw['createdAt'] as String?) ??
+              (raw['created_at'] as String?) ??
+              (raw['updated_at'] as String?) ??
+              '',
+        ) ??
         DateTime.now();
     final typeRaw = (raw['type'] as String?) ?? '';
     return ActivityItem(
@@ -475,7 +485,10 @@ class WorkerSyncService {
       jobTitle: (raw['job_title'] as String?) ?? '',
       email: email,
       phone: (raw['phone'] as String?) ?? '',
-      profilePhotoUrl: (raw['profile_photo_url'] as String?) ?? '',
+      profilePhotoUrl: (raw['profile_photo_url'] as String?) ??
+          (raw['profilePhotoUrl'] as String?) ??
+          (raw['sender_profile_photo_url'] as String?) ??
+          '',
     );
   }
 

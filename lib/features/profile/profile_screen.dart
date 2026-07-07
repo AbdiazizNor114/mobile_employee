@@ -111,28 +111,6 @@ class _DashboardPassTab extends StatelessWidget {
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final profile = ref.watch(employeeProfileProvider);
-    final companyPlan = ref.watch(companyPlanProvider).toLowerCase();
-    final canConfirmWorkedShifts =
-        companyPlan == 'pro' || companyPlan == 'enterprise';
-    final shiftsToConfirm = canConfirmWorkedShifts
-        ? shifts.where((shift) => shift.canConfirmWork(now)).toList()
-        : <Shift>[]
-      ..sort((a, b) => b.endsAt.compareTo(a.endsAt));
-    final recentlyConfirmedShifts = canConfirmWorkedShifts
-        ? shifts
-            .where(
-              (shift) =>
-                  shift.isWorkConfirmed &&
-                  shift.workConfirmedAt != null &&
-                  shift.workConfirmedAt!.isAfter(
-                    now.subtract(const Duration(days: 7)),
-                  ),
-            )
-            .toList()
-        : <Shift>[]
-      ..sort(
-        (a, b) => b.workConfirmedAt!.compareTo(a.workConfirmedAt!),
-      );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,25 +132,19 @@ class _DashboardPassTab extends StatelessWidget {
             profile: profile,
             onTap: () => _showShiftDetails(context, nextShift),
           ),
-        if (shiftsToConfirm.isNotEmpty ||
-            recentlyConfirmedShifts.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.md),
-          _ShiftConfirmationCard(
-            pendingShifts: shiftsToConfirm,
-            confirmedShifts: recentlyConfirmedShifts,
-          ),
-        ],
         const SizedBox(height: AppSpacing.lg),
         _ShiftListCard(
           title: l10n.availableShifts,
           shifts: availableShifts,
           accentColor: AppColors.primaryGreen,
+          onShiftTap: (shift) => _showShiftDetails(context, shift),
         ),
         const SizedBox(height: AppSpacing.md),
         _ShiftListCard(
           title: l10n.upcomingShifts,
           shifts: upcomingShifts,
           accentColor: AppColors.orangeHours,
+          onShiftTap: (shift) => _showShiftDetails(context, shift),
         ),
       ],
     );
@@ -194,190 +166,6 @@ class _DashboardPassTab extends StatelessWidget {
   }
 }
 
-class _ShiftConfirmationCard extends ConsumerStatefulWidget {
-  const _ShiftConfirmationCard({
-    required this.pendingShifts,
-    required this.confirmedShifts,
-  });
-
-  final List<Shift> pendingShifts;
-  final List<Shift> confirmedShifts;
-
-  @override
-  ConsumerState<_ShiftConfirmationCard> createState() =>
-      _ShiftConfirmationCardState();
-}
-
-class _ShiftConfirmationCardState
-    extends ConsumerState<_ShiftConfirmationCard> {
-  String? _confirmingShiftId;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return DashboardCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.fact_check_outlined,
-                color: AppColors.primaryGreen,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  l10n.shiftConfirmations,
-                  style: AppTypography.headingMedium,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            l10n.confirmWithinSevenDays,
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.mutedText,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          for (final shift in widget.pendingShifts) ...[
-            if (shift != widget.pendingShifts.first) const Divider(),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        shift.role,
-                        style: AppTypography.bodyLarge.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        '${_formatShiftDate(shift.startsAt)} · '
-                        '${_formatTime(shift.startsAt)} - ${_formatTime(shift.endsAt)}',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.mutedText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                FilledButton.icon(
-                  onPressed: _confirmingShiftId == null
-                      ? () => _confirmShift(shift)
-                      : null,
-                  icon: _confirmingShiftId == shift.id
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.check_rounded),
-                  label: Text(
-                    _confirmingShiftId == shift.id
-                        ? l10n.confirming
-                        : l10n.confirmWorked,
-                  ),
-                ),
-              ],
-            ),
-          ],
-          for (final shift in widget.confirmedShifts) ...[
-            if (widget.pendingShifts.isNotEmpty ||
-                shift != widget.confirmedShifts.first)
-              const Divider(),
-            Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: AppColors.primaryGreen,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        shift.role,
-                        style: AppTypography.bodyLarge.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        l10n.confirmedOn(
-                          _formatConfirmationDate(shift.workConfirmedAt!),
-                        ),
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.primaryGreen,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Future<void> _confirmShift(Shift shift) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.confirmWorkedQuestion),
-        content: Text(
-          '${shift.role}\n'
-          '${_formatShiftDate(shift.startsAt)}, '
-          '${_formatTime(shift.startsAt)} - ${_formatTime(shift.endsAt)}\n\n'
-          '${l10n.confirmAttestation}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            icon: const Icon(Icons.check_rounded),
-            label: Text(l10n.confirmWorked),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _confirmingShiftId = shift.id);
-    try {
-      await ref.read(shiftsProvider.notifier).confirmShiftWorked(shift.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.shiftConfirmedAsWorked)),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.shiftConfirmationFailed),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _confirmingShiftId = null);
-    }
-  }
-}
-
 class _NextShiftCard extends StatelessWidget {
   const _NextShiftCard({
     required this.shift,
@@ -391,6 +179,8 @@ class _NextShiftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
     return DashboardCard(
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -424,20 +214,27 @@ class _NextShiftCard extends StatelessWidget {
                   const SizedBox(height: AppSpacing.md),
                   _DetailRow(
                     icon: Icons.calendar_today_outlined,
-                    text: _formatShiftDate(shift.startsAt),
+                    label: l10n.date,
+                    text: _formatShiftDate(shift.startsAt, locale),
                   ),
                   _DetailRow(
                     icon: Icons.schedule,
+                    label: l10n.time,
                     text: '${_formatTime(shift.startsAt)} - '
                         '${_formatTime(shift.endsAt)}',
                   ),
                   _DetailRow(
                     icon: Icons.coffee_outlined,
-                    text: 'Break ${shift.breakMinutes} min',
+                    label: l10n.breakTime,
+                    text: l10n.hoursAndBreak(
+                      _formatShiftHours(shift),
+                      shift.breakMinutes,
+                    ),
                   ),
                   _DetailRow(
                     icon: Icons.confirmation_number_outlined,
-                    text: 'Shift ID ${shift.id.toUpperCase()}',
+                    label: l10n.shiftIdLabel,
+                    text: shift.id.toUpperCase(),
                   ),
                 ],
               ),
@@ -464,6 +261,8 @@ class _ProfileShiftDetailSheet extends StatefulWidget {
 class _ProfileShiftDetailSheetState extends State<_ProfileShiftDetailSheet> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
     final note = widget.shift.notes.trim();
     return SafeArea(
       top: false,
@@ -513,20 +312,27 @@ class _ProfileShiftDetailSheetState extends State<_ProfileShiftDetailSheet> {
             const SizedBox(height: AppSpacing.md),
             _DetailRow(
               icon: Icons.calendar_today_outlined,
-              text: _formatShiftDate(widget.shift.startsAt),
+              label: l10n.date,
+              text: _formatShiftDate(widget.shift.startsAt, locale),
             ),
             _DetailRow(
               icon: Icons.schedule,
+              label: l10n.time,
               text: '${_formatTime(widget.shift.startsAt)} - '
                   '${_formatTime(widget.shift.endsAt)}',
             ),
             _DetailRow(
               icon: Icons.coffee_outlined,
-              text: 'Break ${widget.shift.breakMinutes} min',
+              label: l10n.breakTime,
+              text: l10n.hoursAndBreak(
+                _formatShiftHours(widget.shift),
+                widget.shift.breakMinutes,
+              ),
             ),
             _DetailRow(
               icon: Icons.notes_outlined,
-              text: note.isEmpty ? 'No manager note for this shift.' : note,
+              label: l10n.notes,
+              text: note.isEmpty ? l10n.noManagerNote : note,
             ),
           ],
         ),
@@ -536,10 +342,11 @@ class _ProfileShiftDetailSheetState extends State<_ProfileShiftDetailSheet> {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.text});
+  const _DetailRow({required this.icon, required this.text, this.label});
 
   final IconData icon;
   final String text;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -549,7 +356,22 @@ class _DetailRow extends StatelessWidget {
         children: [
           Icon(icon, size: 17, color: AppColors.primaryGreen),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(text, style: AppTypography.bodyMedium)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (label != null && label!.trim().isNotEmpty)
+                  Text(
+                    label!,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.mutedText,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                Text(text, style: AppTypography.bodyMedium),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -561,14 +383,18 @@ class _ShiftListCard extends StatelessWidget {
     required this.title,
     required this.shifts,
     required this.accentColor,
+    required this.onShiftTap,
   });
 
   final String title;
   final List<Shift> shifts;
   final Color accentColor;
+  final ValueChanged<Shift> onShiftTap;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
     return DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,7 +403,7 @@ class _ShiftListCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           if (shifts.isEmpty)
             Text(
-              'No shifts right now',
+              l10n.noShiftsRightNow,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.mutedText,
               ),
@@ -587,7 +413,15 @@ class _ShiftListCard extends StatelessWidget {
               ShiftListItem(
                 title: shift.role,
                 subtitle: shift.location,
+                date: _formatShiftListDate(shift.startsAt, locale),
                 time: _formatTime(shift.startsAt),
+                detail: '${_formatTime(shift.startsAt)} - '
+                    '${_formatTime(shift.endsAt)} · '
+                    '${l10n.hoursAndBreak(
+                  _formatShiftHours(shift),
+                  shift.breakMinutes,
+                )}',
+                onTap: () => onShiftTap(shift),
                 accentColor: accentColor,
               ),
         ],
@@ -618,6 +452,7 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final requests = ref.watch(absenceRequestsProvider);
     final pending = requests
         .where((request) => request.status == AbsenceStatus.pending)
@@ -649,12 +484,14 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Request absence',
-                            style: AppTypography.headingMedium),
+                        Text(
+                          l10n.requestAbsence,
+                          style: AppTypography.headingMedium,
+                        ),
                         Text(
                           pending == 0
-                              ? 'Send vacation, sick leave, or other time off.'
-                              : '$pending request${pending == 1 ? '' : 's'} waiting for review.',
+                              ? l10n.absenceRequestHelp
+                              : l10n.pendingAbsenceRequests(pending),
                           style: AppTypography.bodyMedium.copyWith(
                             color: AppColors.mutedText,
                           ),
@@ -667,15 +504,15 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
               const SizedBox(height: AppSpacing.lg),
               DropdownButtonFormField<AbsenceType>(
                 initialValue: _type,
-                decoration: const InputDecoration(
-                  labelText: 'Reason',
-                  prefixIcon: Icon(Icons.category_outlined),
+                decoration: InputDecoration(
+                  labelText: l10n.reason,
+                  prefixIcon: const Icon(Icons.category_outlined),
                 ),
                 items: [
                   for (final type in AbsenceType.values)
                     DropdownMenuItem(
                       value: type,
-                      child: Text(_absenceTypeLabel(type)),
+                      child: Text(_absenceTypeLabel(type, l10n)),
                     ),
                 ],
                 onChanged: _submitting
@@ -689,7 +526,7 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
                 children: [
                   Expanded(
                     child: _DatePickButton(
-                      label: 'Start',
+                      label: l10n.start,
                       date: _startDate,
                       onPressed: _submitting
                           ? null
@@ -699,7 +536,7 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: _DatePickButton(
-                      label: 'End',
+                      label: l10n.end,
                       date: _endDate,
                       onPressed: _submitting
                           ? null
@@ -714,10 +551,10 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
                 enabled: !_submitting,
                 minLines: 2,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Note',
-                  hintText: 'Optional message for your manager',
-                  prefixIcon: Icon(Icons.notes_outlined),
+                decoration: InputDecoration(
+                  labelText: l10n.note,
+                  hintText: l10n.optionalManagerMessage,
+                  prefixIcon: const Icon(Icons.notes_outlined),
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -735,19 +572,19 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
                           ),
                         )
                       : const Icon(Icons.send_rounded),
-                  label: Text(_submitting ? 'Sending...' : 'Send request'),
+                  label: Text(_submitting ? l10n.sending : l10n.sendRequest),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text('Requests', style: AppTypography.headingMedium),
+        Text(l10n.requests, style: AppTypography.headingMedium),
         const SizedBox(height: AppSpacing.sm),
         if (requests.isEmpty)
           DashboardCard(
             child: Text(
-              'No absence requests yet.',
+              l10n.noAbsenceRequestsYet,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.mutedText,
               ),
@@ -782,9 +619,10 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     if (_endDate.isBefore(_startDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('End date must be after start date.')),
+        SnackBar(content: Text(l10n.endDateAfterStart)),
       );
       return;
     }
@@ -800,13 +638,13 @@ class _AbsenceTabState extends ConsumerState<_AbsenceTab> {
       _noteController.clear();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Absence request sent.')),
+        SnackBar(content: Text(l10n.absenceRequestSent)),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_requestErrorMessage(error)),
+          content: Text(_requestErrorMessage(error, l10n)),
         ),
       );
     } finally {
@@ -828,6 +666,7 @@ class _DatePickButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).languageCode;
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
@@ -845,7 +684,10 @@ class _DatePickButton extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(_formatShortDate(date), style: AppTypography.bodyMedium),
+          Text(
+            _formatShortDate(date, locale),
+            style: AppTypography.bodyMedium,
+          ),
         ],
       ),
     );
@@ -859,6 +701,8 @@ class _AbsenceRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
     final color = _absenceStatusColor(request.status);
     return DashboardCard(
       child: Column(
@@ -868,7 +712,7 @@ class _AbsenceRequestCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  _absenceTypeLabel(request.type),
+                  _absenceTypeLabel(request.type, l10n),
                   style: AppTypography.headingMedium,
                 ),
               ),
@@ -882,7 +726,7 @@ class _AbsenceRequestCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  _absenceStatusLabel(request.status),
+                  _absenceStatusLabel(request.status, l10n),
                   style: AppTypography.caption.copyWith(
                     color: color,
                     fontWeight: FontWeight.w900,
@@ -894,8 +738,8 @@ class _AbsenceRequestCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           _DetailRow(
             icon: Icons.date_range_outlined,
-            text:
-                '${_formatShortDate(request.startDate)} - ${_formatShortDate(request.endDate)}',
+            text: '${_formatShortDate(request.startDate, locale)} - '
+                '${_formatShortDate(request.endDate, locale)}',
           ),
           if (request.note.trim().isNotEmpty)
             _DetailRow(icon: Icons.notes_outlined, text: request.note.trim()),
@@ -1023,8 +867,81 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-String _formatShiftDate(DateTime date) {
-  return '${_weekdayLong(date)}, ${date.day} ${_monthShort(date)}';
+String _formatShiftDate(DateTime date, String locale) {
+  final weekdays = switch (locale) {
+    'so' => const [
+        'Isniin',
+        'Talaado',
+        'Arbaco',
+        'Khamiis',
+        'Jimce',
+        'Sabti',
+        'Axad',
+      ],
+    'sw' => const [
+        'Jumatatu',
+        'Jumanne',
+        'Jumatano',
+        'Alhamisi',
+        'Ijumaa',
+        'Jumamosi',
+        'Jumapili',
+      ],
+    _ => const [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+      ],
+  };
+  final months = switch (locale) {
+    'so' => const [
+        'Jan',
+        'Feb',
+        'Maar',
+        'Abr',
+        'May',
+        'Juun',
+        'Luul',
+        'Ago',
+        'Seb',
+        'Okt',
+        'Nof',
+        'Dis',
+      ],
+    'sw' => const [
+        'Jan',
+        'Feb',
+        'Mac',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des',
+      ],
+    _ => const [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ],
+  };
+  return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
 }
 
 String _formatTime(DateTime date) {
@@ -1033,29 +950,43 @@ String _formatTime(DateTime date) {
   return '$hour:$minute';
 }
 
-String _formatConfirmationDate(DateTime date) {
-  final local = date.toLocal();
-  return '${local.day} ${_monthShort(local)} at ${_formatTime(local)}';
+String _formatShiftHours(Shift shift) {
+  var end = shift.endsAt;
+  if (!end.isAfter(shift.startsAt)) {
+    end = end.add(const Duration(days: 1));
+  }
+  final hours = end.difference(shift.startsAt).inMinutes / 60;
+  if (hours == hours.roundToDouble()) return hours.toStringAsFixed(0);
+  return hours.toStringAsFixed(1);
 }
 
-String _formatShortDate(DateTime date) {
-  return '${date.day} ${_monthShort(date)} ${date.year}';
+String _formatShortDate(DateTime date, String locale) {
+  return '${date.day} ${_monthShort(date, locale)} ${date.year}';
 }
 
-String _absenceTypeLabel(AbsenceType type) {
+String _formatShiftListDate(DateTime date, String locale) {
+  final weekday = switch (locale) {
+    'so' => const ['Isn', 'Tal', 'Arb', 'Kha', 'Jim', 'Sab', 'Axd'],
+    'sw' => const ['Jtt', 'Jnn', 'Jtn', 'Alh', 'Ijm', 'Jms', 'Jpl'],
+    _ => const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  };
+  return '${weekday[date.weekday - 1]} ${date.day}';
+}
+
+String _absenceTypeLabel(AbsenceType type, AppLocalizations l10n) {
   return switch (type) {
-    AbsenceType.vacation => 'Vacation',
-    AbsenceType.sick => 'Sick leave',
-    AbsenceType.parental => 'Parental leave',
-    AbsenceType.other => 'Other',
+    AbsenceType.vacation => l10n.vacation,
+    AbsenceType.sick => l10n.sickLeave,
+    AbsenceType.parental => l10n.parentalLeave,
+    AbsenceType.other => l10n.otherAbsence,
   };
 }
 
-String _absenceStatusLabel(AbsenceStatus status) {
+String _absenceStatusLabel(AbsenceStatus status, AppLocalizations l10n) {
   return switch (status) {
-    AbsenceStatus.pending => 'Pending',
-    AbsenceStatus.approved => 'Approved',
-    AbsenceStatus.denied => 'Denied',
+    AbsenceStatus.pending => l10n.pending,
+    AbsenceStatus.approved => l10n.approved,
+    AbsenceStatus.denied => l10n.denied,
   };
 }
 
@@ -1067,7 +998,7 @@ Color _absenceStatusColor(AbsenceStatus status) {
   };
 }
 
-String _requestErrorMessage(Object error) {
+String _requestErrorMessage(Object error, AppLocalizations l10n) {
   if (error is DioException) {
     final statusCode = error.response?.statusCode;
     final data = error.response?.data;
@@ -1076,46 +1007,63 @@ String _requestErrorMessage(Object error) {
       return serverMessage;
     }
     if (statusCode == 404) {
-      return 'Absence requests are not available for this workplace yet.';
+      return l10n.absenceRequestsUnavailable;
     }
     if (statusCode == 401 || statusCode == 403) {
-      return 'Your session cannot send this request. Sign in again and retry.';
+      return l10n.sessionCannotSendRequest;
     }
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout) {
-      return 'Could not reach ShaqoNet. Check your connection and try again.';
+      return l10n.connectionFailedRetry;
     }
   }
-  return 'Could not send request. Pull to refresh and try again.';
+  return l10n.absenceRequestFailed;
 }
 
-String _weekdayLong(DateTime date) {
-  const labels = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-  return labels[date.weekday - 1];
-}
-
-String _monthShort(DateTime date) {
-  const labels = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
+String _monthShort(DateTime date, [String locale = 'en']) {
+  final labels = switch (locale) {
+    'so' => const [
+        'Jan',
+        'Feb',
+        'Maar',
+        'Abr',
+        'May',
+        'Juun',
+        'Luul',
+        'Ago',
+        'Seb',
+        'Okt',
+        'Nof',
+        'Dis',
+      ],
+    'sw' => const [
+        'Jan',
+        'Feb',
+        'Mac',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des',
+      ],
+    _ => const [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ],
+  };
   return labels[date.month - 1];
 }

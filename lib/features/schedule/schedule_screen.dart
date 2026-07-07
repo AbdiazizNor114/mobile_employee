@@ -22,7 +22,7 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   int _selectedTab = 0;
-  int _selectedDay = 0;
+  late DateTime _selectedDate = _startOfDay(DateTime.now());
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +30,17 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final locale = Localizations.localeOf(context).languageCode;
     final shifts = ref.watch(shiftsProvider);
     final now = DateTime.now();
-    final selectedDate = _startOfDay(now).add(Duration(days: _selectedDay));
+    final weekStart = _startOfWeek(_selectedDate);
+    final weekEnd = weekStart.add(const Duration(days: 6));
     final upcomingShifts =
         shifts.where((shift) => !shift.hasEnded(now)).toList();
+    final weekOpenShifts = upcomingShifts
+        .where((shift) =>
+            shift.status == ShiftStatus.available &&
+            !_startOfDay(shift.startsAt).isBefore(weekStart) &&
+            !_startOfDay(shift.startsAt).isAfter(weekEnd))
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final visibleShifts = switch (_selectedTab) {
       1 =>
         upcomingShifts.where((shift) => shift.status == ShiftStatus.confirmed),
@@ -40,8 +48,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         upcomingShifts.where((shift) => shift.status == ShiftStatus.available),
       _ => upcomingShifts,
     }
-        .where((shift) => _isSameDay(shift.startsAt, selectedDate))
-        .toList();
+        .where((shift) => _isSameDay(shift.startsAt, _selectedDate))
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 760.0 : double.infinity;
 
@@ -51,6 +60,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           AppHeader(
             title: l10n.schedule,
             leadingIcon: Icons.calendar_month_outlined,
+            onLeadingPressed: _pickScheduleDate,
             trailingIcon: Icons.tune_rounded,
           ),
           Expanded(
@@ -73,14 +83,25 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                       const SizedBox(height: AppSpacing.md),
                       DashboardCard(
                         child: _WeekStrip(
-                          selectedDay: _selectedDay,
-                          onSelected: (index) =>
-                              setState(() => _selectedDay = index),
+                          weekStart: weekStart,
+                          selectedDate: _selectedDate,
+                          onSelected: (date) =>
+                              setState(() => _selectedDate = date),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       _ScheduleSummary(shifts: upcomingShifts),
                       const SizedBox(height: AppSpacing.md),
+                      if (weekOpenShifts.isNotEmpty) ...[
+                        DashboardCard(
+                          child: _OpenShiftsThisWeek(
+                            shifts: weekOpenShifts,
+                            onTapShift: (shift) =>
+                                _showShiftDetails(context, shift),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
                       DashboardCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,7 +111,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                                 Expanded(
                                   child: Text(
                                     l10n.shiftsFor(
-                                      _scheduleDateLabel(selectedDate, locale),
+                                      _scheduleDateLabel(_selectedDate, locale),
                                     ),
                                     style: AppTypography.headingMedium,
                                   ),
@@ -158,19 +179,37 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       ),
     );
   }
+
+  Future<void> _pickScheduleDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: _startOfDay(now).subtract(const Duration(days: 30)),
+      lastDate: _startOfDay(now).add(const Duration(days: 180)),
+      helpText: AppLocalizations.of(context).chooseScheduleDate,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _selectedDate = _startOfDay(picked));
+  }
 }
 
 class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({required this.selectedDay, required this.onSelected});
+  const _WeekStrip({
+    required this.weekStart,
+    required this.selectedDate,
+    required this.onSelected,
+  });
 
-  final int selectedDay;
-  final ValueChanged<int> onSelected;
+  final DateTime weekStart;
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final today = DateTime.now();
-    final days = List.generate(7, (index) => today.add(Duration(days: index)));
+    final days =
+        List.generate(7, (index) => weekStart.add(Duration(days: index)));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,13 +226,59 @@ class _WeekStrip extends StatelessWidget {
                   ),
                   child: _DayPill(
                     date: entry.$2,
-                    isSelected: selectedDay == entry.$1,
-                    onTap: () => onSelected(entry.$1),
+                    isSelected: _isSameDay(selectedDate, entry.$2),
+                    onTap: () => onSelected(entry.$2),
                   ),
                 ),
               ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+class _OpenShiftsThisWeek extends StatelessWidget {
+  const _OpenShiftsThisWeek({
+    required this.shifts,
+    required this.onTapShift,
+  });
+
+  final List<Shift> shifts;
+  final ValueChanged<Shift> onTapShift;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.openShiftsThisWeek,
+                style: AppTypography.headingMedium,
+              ),
+            ),
+            Text(
+              l10n.shiftCount(shifts.length),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.mutedText,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final shift in shifts) ...[
+          _ScheduleShiftTile(
+            shift: shift,
+            onTap: () => onTapShift(shift),
+          ),
+          if (shift != shifts.last) const Divider(height: AppSpacing.lg),
+        ],
       ],
     );
   }
@@ -778,6 +863,11 @@ String _scheduleLongDateLabel(DateTime date, String locale) {
 
 DateTime _startOfDay(DateTime date) {
   return DateTime(date.year, date.month, date.day);
+}
+
+DateTime _startOfWeek(DateTime date) {
+  final day = _startOfDay(date);
+  return day.subtract(Duration(days: day.weekday - 1));
 }
 
 bool _isSameDay(DateTime a, DateTime b) {

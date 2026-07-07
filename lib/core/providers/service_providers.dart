@@ -2,8 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_config.dart';
 import '../services/api_service.dart';
+import '../services/apns_notification_service.dart';
 import '../services/auth_service.dart';
+import '../services/local_notification_service.dart';
 import '../services/storage_service.dart';
+import '../services/supabase_realtime_sync_service.dart';
 import '../services/worker_sync_service.dart';
 
 import 'mock_work_provider.dart';
@@ -42,6 +45,30 @@ final workerSyncServiceProvider = Provider<WorkerSyncService>((ref) {
     apiService: ref.watch(apiServiceProvider),
     authService: ref.watch(authServiceProvider),
   );
+});
+
+final localNotificationServiceProvider =
+    Provider<LocalNotificationService>((ref) {
+  return LocalNotificationService();
+});
+
+final apnsNotificationServiceProvider =
+    Provider<ApnsNotificationService>((ref) {
+  return ApnsNotificationService(
+    apiService: ref.watch(apiServiceProvider),
+    authService: ref.watch(authServiceProvider),
+  );
+});
+
+final supabaseRealtimeSyncServiceProvider =
+    Provider<SupabaseRealtimeSyncService>((ref) {
+  final service = SupabaseRealtimeSyncService(
+    config: ref.watch(appConfigProvider),
+    authService: ref.watch(authServiceProvider),
+    notifications: ref.watch(localNotificationServiceProvider),
+  );
+  ref.onDispose(service.stop);
+  return service;
 });
 
 final demoSessionProvider = StateProvider<bool>((ref) => false);

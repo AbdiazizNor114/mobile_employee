@@ -9,6 +9,7 @@ import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/message_provider.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
+import '../../core/services/supabase_realtime_sync_service.dart';
 import '../../core/widgets/dashboard_card.dart';
 import '../../core/widgets/shaqonet_bottom_nav_bar.dart';
 import '../activity/activity_screen.dart';
@@ -28,6 +29,7 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
   static const _autoSyncInterval = Duration(seconds: 12);
   int _currentIndex = 0;
   Timer? _autoSyncTimer;
+  SupabaseRealtimeSyncService? _realtimeSyncService;
   bool _syncInFlight = false;
   bool _manualSyncInFlight = false;
 
@@ -36,11 +38,22 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
     super.initState();
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _startAutoSync();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await ref.read(localNotificationServiceProvider).initialize();
+      if (!mounted) return;
+      await ref.read(apnsNotificationServiceProvider).registerCurrentDevice();
+      if (!mounted) return;
+      final realtimeSync = ref.read(supabaseRealtimeSyncServiceProvider);
+      _realtimeSyncService = realtimeSync;
+      realtimeSync.start(onChange: () => _syncNow(force: true));
+    });
   }
 
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _realtimeSyncService?.stop();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     super.dispose();
   }

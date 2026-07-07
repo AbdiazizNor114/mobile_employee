@@ -28,6 +28,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signIn => 'Sign in';
 
   @override
+  String get signingIn => 'Signing in...';
+
+  @override
+  String get forgotPassword => 'Forgot password?';
+
+  @override
+  String get validEmailRequired => 'Please enter a valid email address.';
+
+  @override
+  String get passwordMinLength => 'Password must be at least 6 characters.';
+
+  @override
+  String get signInGenericError =>
+      'Could not sign in. Check your email and password.';
+
+  @override
+  String get serverUnreachable =>
+      'Could not reach the ShaqoNet server. Please try again.';
+
+  @override
+  String signInFailedWithStatus(int status) {
+    return 'Sign-in failed ($status). Please try again.';
+  }
+
+  @override
+  String get resetPassword => 'Reset password';
+
+  @override
+  String get resetPasswordHelp =>
+      'Enter your account email and we will send you a secure reset link.';
+
+  @override
+  String get sendResetLink => 'Send reset link';
+
+  @override
+  String get passwordResetSent =>
+      'Password reset email sent. Check your inbox.';
+
+  @override
+  String get passwordResetFailed => 'Could not send reset email. Try again.';
+
+  @override
   String get demoMode => 'Demo mode';
 
   @override
@@ -176,6 +218,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get duration => 'Duration';
+
+  @override
+  String get location => 'Location';
 
   @override
   String get notes => 'Notes';
@@ -336,6 +381,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noUpcomingShifts => 'No upcoming shifts yet';
 
   @override
+  String get noShiftsRightNow => 'No shifts right now';
+
+  @override
   String get shiftConfirmations => 'Shift confirmations';
 
   @override
@@ -359,6 +407,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get confirmAttestation =>
       'I confirm that I worked this shift as scheduled.';
+
+  @override
+  String shiftId(String id) {
+    return 'Shift ID $id';
+  }
+
+  @override
+  String get shiftIdLabel => 'Shift ID';
 
   @override
   String get cancel => 'Cancel';
@@ -397,6 +453,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contacts => 'Contacts';
 
   @override
+  String get noManagerContactsYet => 'No manager contacts yet';
+
+  @override
   String get writeMessage => 'Write message';
 
   @override
@@ -406,10 +465,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendDirectlyToManagers => 'Send directly to your managers.';
 
   @override
+  String get sendPrivateTextToManagers => 'Send a private text to managers.';
+
+  @override
   String get writeYourMessage => 'Write your message...';
 
   @override
   String get sendPrivateText => 'Send private text';
+
+  @override
+  String get postedToTeamHub => 'Posted to team hub.';
+
+  @override
+  String get messageSentToManager => 'Message sent to your manager.';
+
+  @override
+  String get couldNotPost => 'Could not post. Retry sync and try again.';
+
+  @override
+  String get teamUpdatesReadOnly => 'Team updates are read-only on this plan.';
+
+  @override
+  String get postHubComment => 'Post hub comment';
+
+  @override
+  String get comments => 'Comments';
+
+  @override
+  String get noCommentsYet =>
+      'No comments yet. Add the first one so the whole team can see it.';
+
+  @override
+  String get whatShouldTeamTrack => 'What should the team track?';
+
+  @override
+  String get postEveryoneCanSee => 'Post so everyone can see and comment.';
+
+  @override
+  String get hubCommentInfo =>
+      'This comment stays in the public Team Hub thread so everyone works from the same record.';
+
+  @override
+  String get addHubComment => 'Add a hub comment for your team...';
+
+  @override
+  String get postComment => 'Post comment';
+
+  @override
+  String get postToHub => 'Post to hub';
+
+  @override
+  String get noHubPostsYet => 'No hub posts yet';
+
+  @override
+  String get noHubPostsSubtitle =>
+      'Post an update or comment when the whole team should see it.';
+
+  @override
+  String get teamUpdateFallback => 'Team update';
 
   @override
   String get noMessagesYet => 'No messages yet';
@@ -436,6 +549,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get comment => 'Comment';
+
+  @override
+  String get activityShiftPublished => 'Shift published';
+
+  @override
+  String get openShiftsThisWeek => 'Open shifts this week';
+
+  @override
+  String get chooseScheduleDate => 'Choose schedule date';
 
   @override
   String get editProfile => 'Edit profile';
@@ -521,4 +643,92 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return 'AI insight: $_temp0 waiting for confirmation. The oldest must be confirmed $_temp1.';
   }
+
+  @override
+  String get requestAbsence => 'Request absence';
+
+  @override
+  String get absenceRequestHelp =>
+      'Send vacation, sick leave, or other time off.';
+
+  @override
+  String pendingAbsenceRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count requests waiting for review',
+      one: '1 request waiting for review',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reason => 'Reason';
+
+  @override
+  String get start => 'Start';
+
+  @override
+  String get end => 'End';
+
+  @override
+  String get note => 'Note';
+
+  @override
+  String get optionalManagerMessage => 'Optional message for your manager';
+
+  @override
+  String get sendRequest => 'Send request';
+
+  @override
+  String get sending => 'Sending...';
+
+  @override
+  String get requests => 'Requests';
+
+  @override
+  String get noAbsenceRequestsYet => 'No absence requests yet.';
+
+  @override
+  String get endDateAfterStart => 'End date must be after start date.';
+
+  @override
+  String get absenceRequestSent => 'Absence request sent.';
+
+  @override
+  String get absenceRequestsUnavailable =>
+      'Absence requests are not available for this workplace yet.';
+
+  @override
+  String get sessionCannotSendRequest =>
+      'Your session cannot send this request. Sign in again and retry.';
+
+  @override
+  String get connectionFailedRetry =>
+      'Could not reach ShaqoNet. Check your connection and try again.';
+
+  @override
+  String get absenceRequestFailed =>
+      'Could not send request. Pull to refresh and try again.';
+
+  @override
+  String get vacation => 'Vacation';
+
+  @override
+  String get sickLeave => 'Sick leave';
+
+  @override
+  String get parentalLeave => 'Parental leave';
+
+  @override
+  String get otherAbsence => 'Other';
+
+  @override
+  String get pending => 'Pending';
+
+  @override
+  String get approved => 'Approved';
+
+  @override
+  String get denied => 'Denied';
 }

@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/providers/service_providers.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -28,11 +29,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   Future<void> _sendReset() async {
+    if (_isLoading) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final l10n = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
         _sent = false;
-        _message = 'Please enter a valid email address.';
+        _message = l10n.validEmailRequired;
       });
       return;
     }
@@ -47,11 +51,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       if (!mounted) return;
       setState(() {
         _sent = true;
-        _message = 'Password reset email sent. Check your inbox.';
+        _message = l10n.passwordResetSent;
       });
     } catch (error) {
       if (!mounted) return;
-      var message = 'Could not send reset email. Try again.';
+      var message = l10n.passwordResetFailed;
       if (error is ArgumentError) {
         message = error.message.toString();
       }
@@ -72,6 +76,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -93,10 +98,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       ),
                     ),
                     const Spacer(),
-                    Text('Reset password', style: AppTypography.headingLarge),
+                    Text(
+                      l10n.resetPassword,
+                      style: AppTypography.headingLarge,
+                    ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Enter your account email and we will send you a secure reset link.',
+                      l10n.resetPasswordHelp,
                       style: AppTypography.bodyLarge.copyWith(
                         color: AppColors.mutedText,
                       ),
@@ -107,13 +115,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _isLoading ? null : _sendReset(),
-                      decoration: const InputDecoration(labelText: 'Email'),
+                      autofillHints: const [AutofillHints.email],
+                      decoration: InputDecoration(labelText: l10n.email),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     FilledButton(
                       onPressed: _isLoading ? null : _sendReset,
                       child:
-                          Text(_isLoading ? 'Sending...' : 'Send reset link'),
+                          Text(_isLoading ? l10n.sending : l10n.sendResetLink),
                     ),
                     if (_message != null) ...[
                       const SizedBox(height: AppSpacing.md),

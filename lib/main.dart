@@ -5,6 +5,7 @@ import 'core/config/app_config.dart';
 import 'core/providers/service_providers.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: ShaqoNetEmployeeBootstrap()));
 }
 

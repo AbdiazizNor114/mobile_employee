@@ -28,6 +28,50 @@ class AppLocalizationsSo extends AppLocalizations {
   String get signIn => 'Gal';
 
   @override
+  String get signingIn => 'Waa la galayaa...';
+
+  @override
+  String get forgotPassword => 'Ma illowday furaha sirta ah?';
+
+  @override
+  String get validEmailRequired => 'Fadlan geli iimayl sax ah.';
+
+  @override
+  String get passwordMinLength =>
+      'Furaha sirta ahi waa inuu ugu yaraan 6 xaraf noqdaa.';
+
+  @override
+  String get signInGenericError =>
+      'Lama geli karin. Hubi iimaylka iyo furaha sirta ah.';
+
+  @override
+  String get serverUnreachable =>
+      'Server-ka ShaqoNet lama gaari karo. Fadlan mar kale isku day.';
+
+  @override
+  String signInFailedWithStatus(int status) {
+    return 'Gelitaanka wuu fashilmay ($status). Fadlan mar kale isku day.';
+  }
+
+  @override
+  String get resetPassword => 'Dib u dejin furaha sirta ah';
+
+  @override
+  String get resetPasswordHelp =>
+      'Geli iimaylka koontadaada, waxaan kuu diri doonaa xiriir ammaan ah oo furaha lagu beddelo.';
+
+  @override
+  String get sendResetLink => 'Dir xiriirka beddelka';
+
+  @override
+  String get passwordResetSent =>
+      'Iimaylka beddelka furaha waa la diray. Hubi sanduuqaaga.';
+
+  @override
+  String get passwordResetFailed =>
+      'Iimaylka beddelka lama diri karin. Mar kale isku day.';
+
+  @override
   String get demoMode => 'Tijaabo';
 
   @override
@@ -177,6 +221,9 @@ class AppLocalizationsSo extends AppLocalizations {
 
   @override
   String get duration => 'Muddada';
+
+  @override
+  String get location => 'Goobta';
 
   @override
   String get notes => 'Faahfaahin';
@@ -338,6 +385,9 @@ class AppLocalizationsSo extends AppLocalizations {
   String get noUpcomingShifts => 'Weli shaqo soo socota ma jirto';
 
   @override
+  String get noShiftsRightNow => 'Hadda shaqo ma jirto';
+
+  @override
   String get shiftConfirmations => 'Xaqiijinta shaqooyinka';
 
   @override
@@ -361,6 +411,14 @@ class AppLocalizationsSo extends AppLocalizations {
   @override
   String get confirmAttestation =>
       'Waxaan xaqiijinayaa inaan shaqadan u shaqeeyay sidii loo qorsheeyay.';
+
+  @override
+  String shiftId(String id) {
+    return 'Aqoonsiga shaqada $id';
+  }
+
+  @override
+  String get shiftIdLabel => 'Aqoonsiga shaqada';
 
   @override
   String get cancel => 'Jooji';
@@ -399,6 +457,9 @@ class AppLocalizationsSo extends AppLocalizations {
   String get contacts => 'Xiriirrada';
 
   @override
+  String get noManagerContactsYet => 'Weli xiriirrada maamulayaasha lama hayo';
+
+  @override
   String get writeMessage => 'Qor farriin';
 
   @override
@@ -408,10 +469,67 @@ class AppLocalizationsSo extends AppLocalizations {
   String get sendDirectlyToManagers => 'Si gaar ah ugu dir maamulayaashaada.';
 
   @override
+  String get sendPrivateTextToManagers =>
+      'Farriin gaar ah ugu dir maamulayaasha.';
+
+  @override
   String get writeYourMessage => 'Farriintaada qor...';
 
   @override
   String get sendPrivateText => 'Dir farriin gaar ah';
+
+  @override
+  String get postedToTeamHub => 'Waxaa lagu qoray xarunta kooxda.';
+
+  @override
+  String get messageSentToManager => 'Farriinta waxaa loo diray maamulahaaga.';
+
+  @override
+  String get couldNotPost =>
+      'Lama diri karin. Cusboonaysii kadib mar kale isku day.';
+
+  @override
+  String get teamUpdatesReadOnly =>
+      'Cusboonaysiinta kooxda qorshahan waa akhris keliya.';
+
+  @override
+  String get postHubComment => 'Ku qor faallo xarunta kooxda';
+
+  @override
+  String get comments => 'Faallooyin';
+
+  @override
+  String get noCommentsYet =>
+      'Weli faallooyin ma jiraan. Ku dar ta ugu horreysa si kooxda oo dhan u aragto.';
+
+  @override
+  String get whatShouldTeamTrack => 'Maxay kooxdu la socotaa?';
+
+  @override
+  String get postEveryoneCanSee => 'Ku qor si qof walba u arko una faalloodo.';
+
+  @override
+  String get hubCommentInfo =>
+      'Faalladani waxay ku jiraysaa xarunta guud ee kooxda si qof walba uga shaqeeyo xog isku mid ah.';
+
+  @override
+  String get addHubComment => 'Kooxdaada u qor faallo...';
+
+  @override
+  String get postComment => 'Dir faallo';
+
+  @override
+  String get postToHub => 'Ku qor xarunta';
+
+  @override
+  String get noHubPostsYet => 'Weli qoraallo xarunta kooxda ma jiraan';
+
+  @override
+  String get noHubPostsSubtitle =>
+      'Qor cusboonaysiin ama faallo marka kooxda oo dhan ay u baahan tahay inay aragto.';
+
+  @override
+  String get teamUpdateFallback => 'Cusboonaysiin kooxeed';
 
   @override
   String get noMessagesYet => 'Weli farriimo ma jiraan';
@@ -438,6 +556,15 @@ class AppLocalizationsSo extends AppLocalizations {
 
   @override
   String get comment => 'Faallo';
+
+  @override
+  String get activityShiftPublished => 'Shaqada waa la daabacay';
+
+  @override
+  String get openShiftsThisWeek => 'Shaqooyinka furan ee toddobaadkan';
+
+  @override
+  String get chooseScheduleDate => 'Dooro taariikhda jadwalka';
 
   @override
   String get editProfile => 'Wax ka beddel xogtayda';
@@ -526,4 +653,94 @@ class AppLocalizationsSo extends AppLocalizations {
     );
     return 'Talo shaqo: $_temp0 sugaysa xaqiijin. Shaqada ugu horreysa waa in la xaqiijiyaa $_temp1.';
   }
+
+  @override
+  String get requestAbsence => 'Codso maqnaansho';
+
+  @override
+  String get absenceRequestHelp =>
+      'Codso fasax, xanuun, ama waqti kale oo shaqada laga maqnaado.';
+
+  @override
+  String pendingAbsenceRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count codsi ayaa sugaya hubin',
+      one: '1 codsi ayaa sugaya hubin',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reason => 'Sababta';
+
+  @override
+  String get start => 'Bilow';
+
+  @override
+  String get end => 'Dhammaad';
+
+  @override
+  String get note => 'Qoraal';
+
+  @override
+  String get optionalManagerMessage =>
+      'Farriin ikhtiyaari ah oo maamulaha loo diro';
+
+  @override
+  String get sendRequest => 'Dir codsiga';
+
+  @override
+  String get sending => 'Waa la dirayaa...';
+
+  @override
+  String get requests => 'Codsiyada';
+
+  @override
+  String get noAbsenceRequestsYet => 'Weli codsiyo maqnaansho ma jiraan.';
+
+  @override
+  String get endDateAfterStart =>
+      'Taariikhda dhammaadka waa inay ka dambaysaa taariikhda bilowga.';
+
+  @override
+  String get absenceRequestSent => 'Codsiga maqnaanshaha waa la diray.';
+
+  @override
+  String get absenceRequestsUnavailable =>
+      'Codsiyada maqnaanshaha weli goobtan shaqo looma diyaarin.';
+
+  @override
+  String get sessionCannotSendRequest =>
+      'Kalfadhigaagu codsigan ma diri karo. Mar kale gal oo isku day.';
+
+  @override
+  String get connectionFailedRetry =>
+      'ShaqoNet lama gaari karo. Hubi internetkaaga oo mar kale isku day.';
+
+  @override
+  String get absenceRequestFailed =>
+      'Codsiga lama diri karin. Soo jiid si aad u cusboonaysiiso oo mar kale isku day.';
+
+  @override
+  String get vacation => 'Fasax';
+
+  @override
+  String get sickLeave => 'Fasax xanuun';
+
+  @override
+  String get parentalLeave => 'Fasax waalidnimo';
+
+  @override
+  String get otherAbsence => 'Kale';
+
+  @override
+  String get pending => 'Sugaya';
+
+  @override
+  String get approved => 'La oggolaaday';
+
+  @override
+  String get denied => 'La diiday';
 }

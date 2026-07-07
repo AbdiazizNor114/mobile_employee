@@ -44,7 +44,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final activity = ref.watch(activityProvider);
+    final activity = [...ref.watch(activityProvider)]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final unreadCount = ref.watch(unreadActivityCountProvider);
     final contentMaxWidth =
         MediaQuery.sizeOf(context).width >= 760 ? 720.0 : double.infinity;
@@ -106,7 +107,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                                 ActivityListItem(
                                   icon: _iconFor(item.type),
                                   iconColor: _colorFor(item.type),
-                                  title: item.title,
+                                  title: _localizedTitleFor(item, l10n),
                                   subtitle: item.detail,
                                   time: _timeFor(item.createdAt, l10n),
                                   isUnread: item.isUnread,
@@ -152,5 +153,14 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     }
     if (difference.inHours < 24) return l10n.hoursAgo(difference.inHours);
     return l10n.daysAgo(difference.inDays);
+  }
+
+  String _localizedTitleFor(ActivityItem item, AppLocalizations l10n) {
+    final normalized =
+        item.title.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    if (normalized == 'shiftpublished' || normalized == 'shiftspublished') {
+      return l10n.activityShiftPublished;
+    }
+    return item.title;
   }
 }

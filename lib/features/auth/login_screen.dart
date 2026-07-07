@@ -29,16 +29,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _signIn() async {
+    if (_isLoading) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final l10n = AppLocalizations.of(context);
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || !email.contains('@')) {
-      setState(() => _message = 'Please enter a valid email address.');
+      setState(() => _message = l10n.validEmailRequired);
       return;
     }
 
     if (password.length < 6) {
-      setState(() => _message = 'Password must be at least 6 characters.');
+      setState(() => _message = l10n.passwordMinLength);
       return;
     }
 
@@ -60,16 +64,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) context.go('/');
     } catch (error) {
       if (!mounted) return;
-      String message = 'Could not sign in. Check your email and password.';
+      String message = l10n.signInGenericError;
       if (error is DioException) {
         final status = error.response?.statusCode;
         final data = error.response?.data;
         if (error.type == DioExceptionType.connectionError ||
             error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.receiveTimeout) {
-          message = 'Could not reach the ShaqoNet server. Please try again.';
+          message = l10n.serverUnreachable;
         } else if (status != null) {
-          message = 'Sign-in failed ($status). Please try again.';
+          message = l10n.signInFailedWithStatus(status);
         }
         if (data is Map && data['error'] is String) {
           message = data['error'] as String;
@@ -122,12 +126,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
                       decoration: InputDecoration(labelText: l10n.email),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
+                      textInputAction: TextInputAction.go,
+                      autofillHints: const [AutofillHints.password],
+                      onSubmitted: (_) => _signIn(),
                       decoration: InputDecoration(labelText: l10n.password),
                     ),
                     Align(
@@ -136,13 +145,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onPressed: _isLoading
                             ? null
                             : () => context.go('/forgot-password'),
-                        child: const Text('Forgot password?'),
+                        child: Text(l10n.forgotPassword),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     FilledButton(
                       onPressed: _isLoading ? null : _signIn,
-                      child: Text(_isLoading ? 'Signing in...' : l10n.signIn),
+                      child: Text(_isLoading ? l10n.signingIn : l10n.signIn),
                     ),
                     if (_message != null) ...[
                       const SizedBox(height: AppSpacing.md),

@@ -136,6 +136,78 @@ abstract class AppLocalizations {
   /// **'Sign in'**
   String get signIn;
 
+  /// No description provided for @signingIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in...'**
+  String get signingIn;
+
+  /// No description provided for @forgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get forgotPassword;
+
+  /// No description provided for @validEmailRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid email address.'**
+  String get validEmailRequired;
+
+  /// No description provided for @passwordMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters.'**
+  String get passwordMinLength;
+
+  /// No description provided for @signInGenericError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sign in. Check your email and password.'**
+  String get signInGenericError;
+
+  /// No description provided for @serverUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the ShaqoNet server. Please try again.'**
+  String get serverUnreachable;
+
+  /// No description provided for @signInFailedWithStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed ({status}). Please try again.'**
+  String signInFailedWithStatus(int status);
+
+  /// No description provided for @resetPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get resetPassword;
+
+  /// No description provided for @resetPasswordHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your account email and we will send you a secure reset link.'**
+  String get resetPasswordHelp;
+
+  /// No description provided for @sendResetLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Send reset link'**
+  String get sendResetLink;
+
+  /// No description provided for @passwordResetSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset email sent. Check your inbox.'**
+  String get passwordResetSent;
+
+  /// No description provided for @passwordResetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send reset email. Try again.'**
+  String get passwordResetFailed;
+
   /// No description provided for @demoMode.
   ///
   /// In en, this message translates to:
@@ -412,6 +484,12 @@ abstract class AppLocalizations {
   /// **'Duration'**
   String get duration;
 
+  /// No description provided for @location.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get location;
+
   /// No description provided for @notes.
   ///
   /// In en, this message translates to:
@@ -658,6 +736,12 @@ abstract class AppLocalizations {
   /// **'No upcoming shifts yet'**
   String get noUpcomingShifts;
 
+  /// No description provided for @noShiftsRightNow.
+  ///
+  /// In en, this message translates to:
+  /// **'No shifts right now'**
+  String get noShiftsRightNow;
+
   /// No description provided for @shiftConfirmations.
   ///
   /// In en, this message translates to:
@@ -699,6 +783,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I confirm that I worked this shift as scheduled.'**
   String get confirmAttestation;
+
+  /// No description provided for @shiftId.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift ID {id}'**
+  String shiftId(String id);
+
+  /// No description provided for @shiftIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift ID'**
+  String get shiftIdLabel;
 
   /// No description provided for @cancel.
   ///
@@ -766,6 +862,12 @@ abstract class AppLocalizations {
   /// **'Contacts'**
   String get contacts;
 
+  /// No description provided for @noManagerContactsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No manager contacts yet'**
+  String get noManagerContactsYet;
+
   /// No description provided for @writeMessage.
   ///
   /// In en, this message translates to:
@@ -784,6 +886,12 @@ abstract class AppLocalizations {
   /// **'Send directly to your managers.'**
   String get sendDirectlyToManagers;
 
+  /// No description provided for @sendPrivateTextToManagers.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a private text to managers.'**
+  String get sendPrivateTextToManagers;
+
   /// No description provided for @writeYourMessage.
   ///
   /// In en, this message translates to:
@@ -795,6 +903,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send private text'**
   String get sendPrivateText;
+
+  /// No description provided for @postedToTeamHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted to team hub.'**
+  String get postedToTeamHub;
+
+  /// No description provided for @messageSentToManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Message sent to your manager.'**
+  String get messageSentToManager;
+
+  /// No description provided for @couldNotPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not post. Retry sync and try again.'**
+  String get couldNotPost;
+
+  /// No description provided for @teamUpdatesReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Team updates are read-only on this plan.'**
+  String get teamUpdatesReadOnly;
+
+  /// No description provided for @postHubComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Post hub comment'**
+  String get postHubComment;
+
+  /// No description provided for @comments.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get comments;
+
+  /// No description provided for @noCommentsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No comments yet. Add the first one so the whole team can see it.'**
+  String get noCommentsYet;
+
+  /// No description provided for @whatShouldTeamTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'What should the team track?'**
+  String get whatShouldTeamTrack;
+
+  /// No description provided for @postEveryoneCanSee.
+  ///
+  /// In en, this message translates to:
+  /// **'Post so everyone can see and comment.'**
+  String get postEveryoneCanSee;
+
+  /// No description provided for @hubCommentInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'This comment stays in the public Team Hub thread so everyone works from the same record.'**
+  String get hubCommentInfo;
+
+  /// No description provided for @addHubComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a hub comment for your team...'**
+  String get addHubComment;
+
+  /// No description provided for @postComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Post comment'**
+  String get postComment;
+
+  /// No description provided for @postToHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Post to hub'**
+  String get postToHub;
+
+  /// No description provided for @noHubPostsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No hub posts yet'**
+  String get noHubPostsYet;
+
+  /// No description provided for @noHubPostsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Post an update or comment when the whole team should see it.'**
+  String get noHubPostsSubtitle;
+
+  /// No description provided for @teamUpdateFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Team update'**
+  String get teamUpdateFallback;
 
   /// No description provided for @noMessagesYet.
   ///
@@ -843,6 +1047,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Comment'**
   String get comment;
+
+  /// No description provided for @activityShiftPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift published'**
+  String get activityShiftPublished;
+
+  /// No description provided for @openShiftsThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shifts this week'**
+  String get openShiftsThisWeek;
+
+  /// No description provided for @chooseScheduleDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose schedule date'**
+  String get chooseScheduleDate;
 
   /// No description provided for @editProfile.
   ///
@@ -975,6 +1197,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'AI insight: {count, plural, =1{1 completed shift is} other{{count} completed shifts are}} waiting for confirmation. The oldest must be confirmed {days, plural, =0{today} =1{within 1 day} other{within {days} days}}.'**
   String aiPendingConfirmationReminder(int count, int days);
+
+  /// No description provided for @requestAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'Request absence'**
+  String get requestAbsence;
+
+  /// No description provided for @absenceRequestHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Send vacation, sick leave, or other time off.'**
+  String get absenceRequestHelp;
+
+  /// No description provided for @pendingAbsenceRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 request waiting for review} other{{count} requests waiting for review}}'**
+  String pendingAbsenceRequests(int count);
+
+  /// No description provided for @reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get reason;
+
+  /// No description provided for @start.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get start;
+
+  /// No description provided for @end.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get end;
+
+  /// No description provided for @note.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get note;
+
+  /// No description provided for @optionalManagerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional message for your manager'**
+  String get optionalManagerMessage;
+
+  /// No description provided for @sendRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Send request'**
+  String get sendRequest;
+
+  /// No description provided for @sending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending...'**
+  String get sending;
+
+  /// No description provided for @requests.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests'**
+  String get requests;
+
+  /// No description provided for @noAbsenceRequestsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No absence requests yet.'**
+  String get noAbsenceRequestsYet;
+
+  /// No description provided for @endDateAfterStart.
+  ///
+  /// In en, this message translates to:
+  /// **'End date must be after start date.'**
+  String get endDateAfterStart;
+
+  /// No description provided for @absenceRequestSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absence request sent.'**
+  String get absenceRequestSent;
+
+  /// No description provided for @absenceRequestsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Absence requests are not available for this workplace yet.'**
+  String get absenceRequestsUnavailable;
+
+  /// No description provided for @sessionCannotSendRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session cannot send this request. Sign in again and retry.'**
+  String get sessionCannotSendRequest;
+
+  /// No description provided for @connectionFailedRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach ShaqoNet. Check your connection and try again.'**
+  String get connectionFailedRetry;
+
+  /// No description provided for @absenceRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send request. Pull to refresh and try again.'**
+  String get absenceRequestFailed;
+
+  /// No description provided for @vacation.
+  ///
+  /// In en, this message translates to:
+  /// **'Vacation'**
+  String get vacation;
+
+  /// No description provided for @sickLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Sick leave'**
+  String get sickLeave;
+
+  /// No description provided for @parentalLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Parental leave'**
+  String get parentalLeave;
+
+  /// No description provided for @otherAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get otherAbsence;
+
+  /// No description provided for @pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get pending;
+
+  /// No description provided for @approved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get approved;
+
+  /// No description provided for @denied.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get denied;
 }
 
 class _AppLocalizationsDelegate
