@@ -36,10 +36,14 @@ fi
 
 cd "${ROOT_DIR}"
 
+PUBSPEC_VERSION="$(awk '/^version: / {print $2; exit}' pubspec.yaml)"
+PUBSPEC_BUILD_NAME="${PUBSPEC_VERSION%%+*}"
+PUBSPEC_BUILD_NUMBER="${PUBSPEC_VERSION##*+}"
+
 flutter build ipa \
   --release \
-  --build-name="${BUILD_NAME:-0.1.0}" \
-  --build-number="${BUILD_NUMBER:-1}" \
+  --build-name="${BUILD_NAME:-${PUBSPEC_BUILD_NAME}}" \
+  --build-number="${BUILD_NUMBER:-${PUBSPEC_BUILD_NUMBER}}" \
   --dart-define="SHAQONET_API_BASE_URL=${SHAQONET_API_BASE_URL}" \
   --dart-define="SHAQONET_SUPABASE_URL=${SHAQONET_SUPABASE_URL}" \
   --dart-define="SHAQONET_SUPABASE_ANON_KEY=${SHAQONET_SUPABASE_ANON_KEY}"
