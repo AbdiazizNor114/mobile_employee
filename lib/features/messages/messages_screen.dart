@@ -207,7 +207,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         children: [
           _MessagesHeader(
             accent: accent,
-            title: isEnterprise ? l10n.hub : l10n.messages,
+            title: l10n.messages,
             isSending: _isSending,
             canCompose: canCompose,
             isHub: isEnterprise,
@@ -289,9 +289,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                 return _HubTopicRow(
                                   topic: topic,
                                   accent: accent,
-                                  onReact: (emoji) => ref
-                                      .read(messagesProvider.notifier)
-                                      .toggleReaction(topic.root.id, emoji),
                                   onTap: () => _openHubTopic(
                                     topic: topic,
                                     plan: plan,
@@ -407,13 +404,6 @@ class _MessagesHeader extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: AppLocalizations.of(context).markAllRead,
-            onPressed: unreadCount == 0 ? null : onMarkAllRead,
-            icon: const Icon(Icons.mark_email_read_outlined),
-            color: AppColors.cardBackground,
-            disabledColor: AppColors.cardBackground.withValues(alpha: 0.45),
-          ),
-          IconButton(
             tooltip: canCompose
                 ? (isHub
                     ? AppLocalizations.of(context).postHubComment
@@ -430,8 +420,113 @@ class _MessagesHeader extends StatelessWidget {
             color: AppColors.cardBackground,
             disabledColor: AppColors.cardBackground.withValues(alpha: 0.45),
           ),
+          PopupMenuButton<_MessageMenuAction>(
+            tooltip: 'Message options',
+            icon: const Icon(Icons.more_horiz_rounded),
+            color: AppColors.cardBackground,
+            elevation: 10,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            onSelected: (action) {
+              if (action == _MessageMenuAction.markAllRead && unreadCount > 0) {
+                onMarkAllRead();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                enabled: false,
+                child: _MessageMenuHeader(),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.all,
+                child: Text('All'),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.unread,
+                child: Text('Unread'),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.public,
+                child: Text('Public'),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.groups,
+                child: Text('Groups'),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.day,
+                child: Text('Day'),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.archived,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('Archived'),
+                  trailing: Icon(Icons.inventory_2_outlined),
+                ),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.searchPerson,
+                child: Text('Search person'),
+              ),
+              const PopupMenuItem(
+                value: _MessageMenuAction.manage,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('Manage messages'),
+                  trailing: Icon(Icons.settings_outlined),
+                ),
+              ),
+              PopupMenuItem(
+                enabled: unreadCount > 0,
+                value: _MessageMenuAction.markAllRead,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.mark_email_read_outlined),
+                  title: Text(l10n.markAllRead),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+}
+
+enum _MessageMenuAction {
+  all,
+  unread,
+  public,
+  groups,
+  day,
+  archived,
+  searchPerson,
+  manage,
+  markAllRead,
+}
+
+class _MessageMenuHeader extends StatelessWidget {
+  const _MessageMenuHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Filter messages',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.darkText,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const Icon(Icons.filter_alt_outlined, color: AppColors.mutedText),
+      ],
     );
   }
 }
@@ -597,148 +692,63 @@ class _HubTopicRow extends StatelessWidget {
     required this.topic,
     required this.accent,
     required this.onTap,
-    required this.onReact,
   });
 
   final _HubTopic topic;
   final Color accent;
   final VoidCallback onTap;
-  final ValueChanged<String> onReact;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final unread = topic.unreadCount > 0;
-    final photo = profilePhotoProvider(topic.root.senderProfilePhotoUrl);
+    final preview = topic.latest.id == topic.root.id
+        ? topic.root.content
+        : topic.latest.content;
 
     return Material(
       color: AppColors.cardBackground,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: unread
-                        ? accent.withValues(alpha: 0.14)
-                        : AppColors.line,
-                    backgroundImage: photo,
-                    child: photo == null
-                        ? Text(
-                            _initials(topic.root.senderName),
-                            style: AppTypography.caption.copyWith(
-                              color: unread ? accent : AppColors.darkText,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          )
-                        : null,
+                  Expanded(
+                    child: Text(
+                      topic.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.darkText,
+                        fontWeight: unread ? FontWeight.w800 : FontWeight.w700,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            if (unread) ...[
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: accent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                            ],
-                            Expanded(
-                              child: Text(
-                                topic.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.bodyLarge.copyWith(
-                                  color: AppColors.darkText,
-                                  fontWeight: unread
-                                      ? FontWeight.w800
-                                      : FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '${topic.root.senderName} · ${_dateLabel(topic.latestAt)}',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    _dateLabel(topic.latestAt),
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.mutedText,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: 4),
               Text(
-                topic.latest.id == topic.root.id
-                    ? topic.root.content
-                    : '${topic.latest.senderName}: ${topic.latest.content}',
+                preview,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: AppTypography.bodyMedium.copyWith(
+                style: AppTypography.bodyLarge.copyWith(
                   color: AppColors.mutedText,
                   height: 1.35,
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  _MetaChip(
-                    icon: Icons.mode_comment_outlined,
-                    label: l10n.comments,
-                  ),
-                  if (unread) ...[
-                    const SizedBox(width: AppSpacing.sm),
-                    _MetaChip(
-                      icon: Icons.mark_email_unread_outlined,
-                      label: l10n.unreadWithCount(topic.unreadCount),
-                    ),
-                  ],
-                  const Spacer(),
-                  for (final emoji in const ['👍', '❤️', '✅'])
-                    Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.xs),
-                      child: InkWell(
-                        onTap: () => onReact(emoji),
-                        borderRadius: BorderRadius.circular(999),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: topic.root.myReaction == emoji
-                                ? accent.withValues(alpha: 0.14)
-                                : AppColors.background,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: topic.root.myReaction == emoji
-                                  ? accent
-                                  : AppColors.line,
-                            ),
-                          ),
-                          child: Text(
-                            '$emoji${(topic.root.reactionCounts[emoji] ?? 0) > 0 ? ' ${topic.root.reactionCounts[emoji]}' : ''}',
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
               ),
             ],
           ),
@@ -748,50 +758,14 @@ class _HubTopicRow extends StatelessWidget {
   }
 }
 
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppColors.mutedText),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: AppColors.mutedText,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContactsList extends StatelessWidget {
+class _ContactsList extends ConsumerWidget {
   const _ContactsList({required this.contacts, required this.accent});
 
   final List<StaffContact> contacts;
   final Color accent;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (contacts.isEmpty) {
       return ListView(
         children: [
@@ -816,97 +790,171 @@ class _ContactsList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: EdgeInsets.zero,
-      itemCount: contacts.length,
-      separatorBuilder: (context, index) =>
-          const Divider(height: 1, color: AppColors.line),
-      itemBuilder: (context, index) {
-        final contact = contacts[index];
-        final photo = profilePhotoProvider(contact.profilePhotoUrl);
-        return Material(
-          color: AppColors.cardBackground,
-          child: InkWell(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => _ContactDetailPage(
-                  contact: contact,
-                  accent: accent,
+    final companyName = ref.watch(companyNameProvider);
+    final companyLabel = companyName.trim().isEmpty
+        ? 'YOUR COMPANY'
+        : companyName.trim().toUpperCase();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.xxl,
+      ),
+      children: [
+        Text(
+          'CONTACTS AT $companyLabel',
+          textAlign: TextAlign.center,
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.mutedText,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        for (final contact in contacts) ...[
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: _ContactCard(
+                contact: contact,
+                accent: accent,
+                companyName: companyName,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => _ContactDetailPage(
+                      contact: contact,
+                      accent: accent,
+                    ),
+                  ),
                 ),
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+      ],
+    );
+  }
+}
+
+class _ContactCard extends StatelessWidget {
+  const _ContactCard({
+    required this.contact,
+    required this.accent,
+    required this.companyName,
+    required this.onTap,
+  });
+
+  final StaffContact contact;
+  final Color accent;
+  final String companyName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = profilePhotoProvider(contact.profilePhotoUrl);
+    final groupLine = [
+      if (companyName.trim().isNotEmpty) companyName.trim(),
+      contact.subtitle,
+    ].join(' / ');
+
+    return Material(
+      color: AppColors.cardBackground,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.xl,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0F000000),
+                blurRadius: 14,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
                   CircleAvatar(
-                    radius: 25,
+                    radius: 64,
                     backgroundColor: accent.withValues(alpha: 0.14),
                     backgroundImage: photo,
                     child: photo == null
                         ? Text(
                             contact.initials,
-                            style: AppTypography.caption.copyWith(
+                            style: TextStyle(
                               color: accent,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 28,
                             ),
                           )
                         : null,
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          contact.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyLarge.copyWith(
-                            color: AppColors.darkText,
-                            fontWeight: FontWeight.w800,
-                          ),
+                  Positioned(
+                    right: 2,
+                    bottom: 2,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: contact.role == 'manager'
+                            ? accent
+                            : const Color(0xFF9CA3AF),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.cardBackground,
+                          width: 4,
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          contact.subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                        if (contact.email.trim().isNotEmpty ||
-                            contact.phone.trim().isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            [
-                              if (contact.email.trim().isNotEmpty)
-                                contact.email,
-                              if (contact.phone.trim().isNotEmpty)
-                                contact.phone,
-                            ].join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.mutedText,
-                            ),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.mutedText,
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                contact.displayName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppTypography.headingLarge.copyWith(color: accent),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                contact.roleLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.mutedText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                groupLine,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.mutedText,
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
