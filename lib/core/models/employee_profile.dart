@@ -150,6 +150,7 @@ class StaffContact {
   String get roleLabel {
     if (role == 'company_admin') return 'Admin';
     if (role == 'manager') return 'Manager';
+    if (role == 'worker') return 'Worker';
     return 'Contact';
   }
 

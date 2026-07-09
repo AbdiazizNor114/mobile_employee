@@ -16,7 +16,7 @@ enum _MessageFilter { inbox, unread, sent, contacts }
 
 enum _HubSection { direct, feed, contacts }
 
-enum _ComposeAudience { managers, employees, teamHub }
+enum _ComposeAudience { contacts, teamHub }
 
 String _messageTitle(AppMessage message, AppLocalizations l10n) {
   final subject = message.subject.trim();
@@ -60,15 +60,24 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     if (_isSending) return;
     setState(() => _isSending = true);
     try {
-      await ref.read(workerSyncServiceProvider).sendWorkerMessage(
+      final sync = ref.read(workerSyncServiceProvider);
+      if (result.audience == _ComposeAudience.teamHub) {
+        await sync.sendWorkerMessage(
+          subject: result.subject,
+          content: result.content,
+          parentMessageId: result.parentMessageId,
+          sendToAll: true,
+        );
+      } else {
+        for (final recipientId in result.recipientMemberIds) {
+          await sync.sendWorkerMessage(
             subject: result.subject,
             content: result.content,
             parentMessageId: result.parentMessageId,
-            sendToAll: result.audience == _ComposeAudience.teamHub,
-            recipientRole: result.audience == _ComposeAudience.employees
-                ? 'worker'
-                : 'manager',
+            recipientMemberId: recipientId,
           );
+        }
+      }
       await _refreshMessages();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -76,17 +85,17 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           content: Text(
             result.audience == _ComposeAudience.teamHub
                 ? AppLocalizations.of(context).postedToTeamHub
-                : result.audience == _ComposeAudience.managers
+                : result.recipientMemberIds.length == 1
                     ? AppLocalizations.of(context).messageSentToManager
-                    : 'Private message sent to employees.',
+                    : 'Private messages sent.',
           ),
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context).couldNotPost),
+          content: Text('${AppLocalizations.of(context).couldNotPost}: $error'),
         ),
       );
     } finally {
@@ -109,6 +118,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         builder: (context) => _ComposeMessagePage(
           accent: _accentForPlan(plan),
           canUseTeamHub: _canUseTeamHub(plan),
+          contacts: ref.read(staffContactsProvider),
           defaultToTeamHub: false,
         ),
       ),
@@ -1610,6 +1620,7 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                           builder: (context) => _ComposeMessagePage(
                             accent: widget.accent,
                             canUseTeamHub: widget.canUseTeamHub,
+                            contacts: const [],
                             hubOnly: widget.canUseTeamHub,
                             initialSubject:
                                 'Re: ${_rootSubject(currentMessage)}',
@@ -1773,6 +1784,7 @@ class _ComposeMessagePage extends StatefulWidget {
   const _ComposeMessagePage({
     required this.accent,
     required this.canUseTeamHub,
+    required this.contacts,
     this.hubOnly = false,
     this.defaultToTeamHub = false,
     this.initialSubject = '',
@@ -1781,6 +1793,7 @@ class _ComposeMessagePage extends StatefulWidget {
 
   final Color accent;
   final bool canUseTeamHub;
+  final List<StaffContact> contacts;
   final bool hubOnly;
   final bool defaultToTeamHub;
   final String initialSubject;
@@ -1794,6 +1807,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
   late final TextEditingController _subjectController;
   final _contentController = TextEditingController();
   late _ComposeAudience _audience;
+  final Set<String> _selectedContactIds = <String>{};
 
   @override
   void initState() {
@@ -1801,7 +1815,10 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
     _subjectController = TextEditingController(text: widget.initialSubject);
     _audience = widget.hubOnly || widget.defaultToTeamHub
         ? _ComposeAudience.teamHub
-        : _ComposeAudience.managers;
+        : _ComposeAudience.contacts;
+    if (!widget.hubOnly && widget.contacts.length == 1) {
+      _selectedContactIds.add(widget.contacts.first.id);
+    }
   }
 
   @override
@@ -1815,11 +1832,15 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
     final subject = _subjectController.text.trim();
     final content = _contentController.text.trim();
     if (subject.isEmpty || content.isEmpty) return;
+    if (_audience == _ComposeAudience.contacts && _selectedContactIds.isEmpty) {
+      return;
+    }
     Navigator.of(context).pop(
       _ComposeResult(
         subject: subject,
         content: content,
         audience: _audience,
+        recipientMemberIds: _selectedContactIds.toList(),
         parentMessageId: widget.parentMessageId,
       ),
     );
@@ -1864,36 +1885,61 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
           ),
           const SizedBox(height: AppSpacing.lg),
           if (!widget.hubOnly) ...[
-            Text(l10n.audience, style: AppTypography.headingSmall),
+            Text('Send to', style: AppTypography.headingSmall),
             const SizedBox(height: AppSpacing.sm),
-            _AudienceOption(
-              title: l10n.managers,
-              subtitle: widget.canUseTeamHub
-                  ? l10n.sendPrivateTextToManagers
-                  : l10n.sendDirectlyToManagers,
-              value: _ComposeAudience.managers,
-              groupValue: _audience,
-              accent: widget.accent,
-              onChanged: (value) => setState(() => _audience = value),
-            ),
             if (widget.canUseTeamHub)
               _AudienceOption(
-                title: 'Employees',
-                subtitle: 'Send a private text to employees.',
-                value: _ComposeAudience.employees,
-                groupValue: _audience,
-                accent: widget.accent,
-                onChanged: (value) => setState(() => _audience = value),
-              ),
-            if (widget.canUseTeamHub)
-              _AudienceOption(
-                title: l10n.hub,
+                title: 'Team Hub post',
                 subtitle: l10n.postEveryoneCanSee,
                 value: _ComposeAudience.teamHub,
                 groupValue: _audience,
                 accent: widget.accent,
-                onChanged: (value) => setState(() => _audience = value),
+                onChanged: (value) => setState(() {
+                  _audience = value;
+                  _selectedContactIds.clear();
+                }),
               ),
+            _AudienceOption(
+              title: 'Private message',
+              subtitle: 'Choose exactly who should receive it.',
+              value: _ComposeAudience.contacts,
+              groupValue: _audience,
+              accent: widget.accent,
+              onChanged: (value) => setState(() => _audience = value),
+            ),
+            if (_audience == _ComposeAudience.contacts) ...[
+              const SizedBox(height: AppSpacing.sm),
+              if (widget.contacts.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBackground,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Text(
+                    AppLocalizations.of(context).noManagerContactsYet,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                )
+              else
+                for (final contact in widget.contacts)
+                  _RecipientOption(
+                    contact: contact,
+                    accent: widget.accent,
+                    selected: _selectedContactIds.contains(contact.id),
+                    onChanged: (selected) => setState(() {
+                      _audience = _ComposeAudience.contacts;
+                      if (selected) {
+                        _selectedContactIds.add(contact.id);
+                      } else {
+                        _selectedContactIds.remove(contact.id);
+                      }
+                    }),
+                  ),
+            ],
             const SizedBox(height: AppSpacing.lg),
           ] else ...[
             Container(
@@ -1936,7 +1982,9 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                 ? l10n.postComment
                 : _audience == _ComposeAudience.teamHub
                     ? l10n.postToHub
-                    : l10n.sendPrivateText),
+                    : _selectedContactIds.length == 1
+                        ? l10n.sendPrivateText
+                        : 'Send private messages'),
           ),
         ],
       ),
@@ -2022,17 +2070,102 @@ class _AudienceOption extends StatelessWidget {
   }
 }
 
+class _RecipientOption extends StatelessWidget {
+  const _RecipientOption({
+    required this.contact,
+    required this.accent,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final StaffContact contact;
+  final Color accent;
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = profilePhotoProvider(contact.profilePhotoUrl);
+    final subtitleParts = [
+      contact.roleLabel,
+      if (contact.phone.trim().isNotEmpty) contact.phone.trim(),
+    ];
+
+    return Material(
+      color: AppColors.cardBackground,
+      child: InkWell(
+        onTap: () => onChanged(!selected),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: accent.withValues(alpha: 0.14),
+                backgroundImage: photo,
+                child: photo == null
+                    ? Text(
+                        contact.initials,
+                        style: AppTypography.caption.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      contact.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      subtitleParts.join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Checkbox(
+                value: selected,
+                activeColor: accent,
+                onChanged: (value) => onChanged(value ?? false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ComposeResult {
   const _ComposeResult({
     required this.subject,
     required this.content,
     required this.audience,
+    this.recipientMemberIds = const [],
     this.parentMessageId,
   });
 
   final String subject;
   final String content;
   final _ComposeAudience audience;
+  final List<String> recipientMemberIds;
   final String? parentMessageId;
 }
 
