@@ -14,7 +14,7 @@ import '../../l10n/generated/app_localizations.dart';
 
 enum _MessageFilter { inbox, unread, sent, contacts }
 
-enum _HubSection { feed, contacts }
+enum _HubSection { direct, feed, contacts }
 
 enum _ComposeAudience { managers, employees, teamHub }
 
@@ -41,7 +41,7 @@ class MessagesScreen extends ConsumerStatefulWidget {
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   _MessageFilter _filter = _MessageFilter.inbox;
-  _HubSection _hubSection = _HubSection.feed;
+  _HubSection _hubSection = _HubSection.direct;
   bool _isSending = false;
 
   Color _accentForPlan(String plan) {
@@ -63,6 +63,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       await ref.read(workerSyncServiceProvider).sendWorkerMessage(
             subject: result.subject,
             content: result.content,
+            parentMessageId: result.parentMessageId,
             sendToAll: result.audience == _ComposeAudience.teamHub,
             recipientRole: result.audience == _ComposeAudience.employees
                 ? 'worker'
@@ -125,6 +126,20 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     }
 
     if (!mounted) return;
+    if (!_canUseTeamHub(plan)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (context) => _DirectMessagePage(
+            seedMessage: message,
+            accent: _accentForPlan(plan),
+            currentMemberId: ref.read(authServiceProvider).membershipId,
+            canReply: _canCompose(plan),
+          ),
+        ),
+      );
+      return;
+    }
+
     final result = await Navigator.of(context).push<_ComposeResult>(
       MaterialPageRoute(
         builder: (context) => _MessageDetailPage(
@@ -189,7 +204,20 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         .where((message) =>
             message.senderMemberId != membershipId && !message.isRead)
         .length;
-    final hubTopics = _buildHubTopics(messages, membershipId);
+    final directMessages = messages
+        .where((message) =>
+            message.messageScope == 'direct' ||
+            (message.messageScope != 'post' &&
+                message.messageScope != 'comment' &&
+                message.parentMessageId == null))
+        .toList();
+    final hubMessages = messages
+        .where((message) =>
+            message.messageScope == 'post' ||
+            message.messageScope == 'comment' ||
+            message.parentMessageId != null)
+        .toList();
+    final hubTopics = _buildHubTopics(hubMessages, membershipId);
 
     final visibleMessages = messages.where((message) {
       final isSent = message.senderMemberId == membershipId;
@@ -221,7 +249,14 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               child: Row(
                 children: [
                   _MailboxTab(
-                    label: l10n.hub,
+                    label: 'DMs',
+                    isSelected: _hubSection == _HubSection.direct,
+                    accent: accent,
+                    onTap: () =>
+                        setState(() => _hubSection = _HubSection.direct),
+                  ),
+                  _MailboxTab(
+                    label: 'Posts',
                     isSelected: _hubSection == _HubSection.feed,
                     accent: accent,
                     onTap: () => setState(() => _hubSection = _HubSection.feed),
@@ -276,26 +311,52 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               child: isEnterprise
                   ? (_hubSection == _HubSection.contacts
                       ? _ContactsList(contacts: contacts, accent: accent)
-                      : hubTopics.isEmpty
-                          ? const _EmptyHubView()
-                          : ListView.separated(
-                              padding: EdgeInsets.zero,
-                              itemCount: hubTopics.length,
-                              separatorBuilder: (context, index) =>
-                                  const Divider(
-                                      height: 1, color: AppColors.line),
-                              itemBuilder: (context, index) {
-                                final topic = hubTopics[index];
-                                return _HubTopicRow(
-                                  topic: topic,
-                                  accent: accent,
-                                  onTap: () => _openHubTopic(
-                                    topic: topic,
-                                    plan: plan,
-                                  ),
-                                );
-                              },
-                            ))
+                      : _hubSection == _HubSection.direct
+                          ? (directMessages.isEmpty
+                              ? const _NoMessagesView(
+                                  filter: _MessageFilter.inbox)
+                              : ListView.separated(
+                                  padding: EdgeInsets.zero,
+                                  itemCount: directMessages.length,
+                                  separatorBuilder: (context, index) =>
+                                      const Divider(
+                                          height: 1, color: AppColors.line),
+                                  itemBuilder: (context, index) {
+                                    final message = directMessages[index];
+                                    final isSent =
+                                        message.senderMemberId == membershipId;
+                                    return _MessageRow(
+                                      message: message,
+                                      isSent: isSent,
+                                      accent: accent,
+                                      onTap: () => _openMessage(
+                                        message: message,
+                                        isSent: isSent,
+                                        plan: 'pro',
+                                      ),
+                                    );
+                                  },
+                                ))
+                          : hubTopics.isEmpty
+                              ? const _EmptyHubView()
+                              : ListView.separated(
+                                  padding: EdgeInsets.zero,
+                                  itemCount: hubTopics.length,
+                                  separatorBuilder: (context, index) =>
+                                      const Divider(
+                                          height: 1, color: AppColors.line),
+                                  itemBuilder: (context, index) {
+                                    final topic = hubTopics[index];
+                                    return _HubTopicRow(
+                                      topic: topic,
+                                      accent: accent,
+                                      onTap: () => _openHubTopic(
+                                        topic: topic,
+                                        plan: plan,
+                                      ),
+                                    );
+                                  },
+                                ))
                   : _filter == _MessageFilter.contacts
                       ? _ContactsList(contacts: contacts, accent: accent)
                       : visibleMessages.isEmpty
@@ -1173,6 +1234,260 @@ class _ContactDetailRow extends StatelessWidget {
   }
 }
 
+class _DirectMessagePage extends ConsumerStatefulWidget {
+  const _DirectMessagePage({
+    required this.seedMessage,
+    required this.accent,
+    required this.currentMemberId,
+    required this.canReply,
+  });
+
+  final AppMessage seedMessage;
+  final Color accent;
+  final String? currentMemberId;
+  final bool canReply;
+
+  @override
+  ConsumerState<_DirectMessagePage> createState() => _DirectMessagePageState();
+}
+
+class _DirectMessagePageState extends ConsumerState<_DirectMessagePage> {
+  final _replyController = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  String? get _otherMemberId {
+    final current = widget.currentMemberId;
+    if (current == null) return null;
+    return widget.seedMessage.senderMemberId == current
+        ? widget.seedMessage.recipientMemberId
+        : widget.seedMessage.senderMemberId;
+  }
+
+  Future<void> _sendReply() async {
+    final content = _replyController.text.trim();
+    if (content.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    try {
+      await ref.read(workerSyncServiceProvider).sendWorkerMessage(
+            subject: _rootSubject(widget.seedMessage).isEmpty
+                ? 'Direct message'
+                : 'Re: ${_rootSubject(widget.seedMessage)}',
+            content: content,
+            recipientMemberId: _otherMemberId,
+            recipientRole: 'manager',
+          );
+      _replyController.clear();
+      ref.invalidate(backendSyncProvider);
+      await ref.read(backendSyncProvider.future);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).couldNotPost)),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = ref.watch(messagesProvider);
+    final currentId = widget.currentMemberId;
+    final otherId = _otherMemberId;
+    final conversation = messages.where((message) {
+      if (currentId == null || otherId == null) {
+        return message.id == widget.seedMessage.id;
+      }
+      final sentByMeToOther = message.senderMemberId == currentId &&
+          message.recipientMemberId == otherId;
+      final sentByOtherToMe = message.senderMemberId == otherId &&
+          message.recipientMemberId == currentId;
+      return sentByMeToOther || sentByOtherToMe;
+    }).toList()
+      ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    final title = widget.seedMessage.senderMemberId == currentId
+        ? 'Managers'
+        : widget.seedMessage.senderName;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: widget.accent,
+        foregroundColor: AppColors.cardBackground,
+        title: Text(title),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              itemCount: conversation.length,
+              itemBuilder: (context, index) {
+                final message = conversation[index];
+                final isMine = message.senderMemberId == currentId;
+                return _DmBubble(
+                  message: message,
+                  isMine: isMine,
+                  accent: widget.accent,
+                );
+              },
+            ),
+          ),
+          if (widget.canReply)
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppColors.cardBackground,
+                  border: Border(top: BorderSide(color: AppColors.line)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _replyController,
+                        minLines: 1,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          hintText:
+                              AppLocalizations.of(context).writeYourMessage,
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    IconButton.filled(
+                      onPressed: _sending ? null : _sendReply,
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: widget.accent,
+                        foregroundColor: AppColors.cardBackground,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DmBubble extends StatelessWidget {
+  const _DmBubble({
+    required this.message,
+    required this.isMine,
+    required this.accent,
+  });
+
+  final AppMessage message;
+  final bool isMine;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = profilePhotoProvider(message.senderProfilePhotoUrl);
+    final bubbleColor = isMine ? accent : AppColors.cardBackground;
+    final textColor = isMine ? AppColors.cardBackground : AppColors.darkText;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        mainAxisAlignment:
+            isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMine) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: accent.withValues(alpha: 0.14),
+              backgroundImage: photo,
+              child: photo == null
+                  ? Text(
+                      _initials(message.senderName),
+                      style: AppTypography.caption.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          Flexible(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 320),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isMine ? 18 : 4),
+                  bottomRight: Radius.circular(isMine ? 4 : 18),
+                ),
+                border: isMine ? null : Border.all(color: AppColors.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.content,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: textColor,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _dateLabel(message.sentAt),
+                    style: AppTypography.caption.copyWith(
+                      color: isMine
+                          ? AppColors.cardBackground.withValues(alpha: 0.75)
+                          : AppColors.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MessageDetailPage extends ConsumerStatefulWidget {
   const _MessageDetailPage({
     required this.message,
@@ -1198,8 +1513,16 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final comments = widget.thread
-        .where((item) => item.id != widget.message.id)
+    final messages = ref.watch(messagesProvider);
+    final currentMessage = messages.firstWhere(
+      (message) => message.id == widget.message.id,
+      orElse: () => widget.message,
+    );
+    final comments = messages
+        .where((item) =>
+            item.id != currentMessage.id &&
+            (item.parentMessageId == currentMessage.id ||
+                widget.thread.any((threadItem) => threadItem.id == item.id)))
         .toList()
       ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
 
@@ -1220,13 +1543,16 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           _ThreadMessageCard(
-            message: widget.message,
+            message: currentMessage,
             accent: widget.accent,
-            title: _messageTitle(widget.message, l10n),
-            authorLabel: widget.isSent ? l10n.you : widget.message.senderName,
-            onReact: (emoji) => ref
-                .read(messagesProvider.notifier)
-                .toggleReaction(widget.message.id, emoji),
+            title: _messageTitle(currentMessage, l10n),
+            authorLabel: widget.isSent ? l10n.you : currentMessage.senderName,
+            onReact: (emoji) async {
+              await ref
+                  .read(messagesProvider.notifier)
+                  .toggleReaction(currentMessage.id, emoji);
+              ref.invalidate(backendSyncProvider);
+            },
             elevated: true,
           ),
           if (widget.canUseTeamHub) ...[
@@ -1261,9 +1587,12 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                   authorLabel: comment.senderMemberId == null
                       ? comment.senderName
                       : comment.senderName,
-                  onReact: (emoji) => ref
-                      .read(messagesProvider.notifier)
-                      .toggleReaction(comment.id, emoji),
+                  onReact: (emoji) async {
+                    await ref
+                        .read(messagesProvider.notifier)
+                        .toggleReaction(comment.id, emoji);
+                    ref.invalidate(backendSyncProvider);
+                  },
                 ),
                 const SizedBox(height: AppSpacing.sm),
               ],
@@ -1283,7 +1612,9 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                             canUseTeamHub: widget.canUseTeamHub,
                             hubOnly: widget.canUseTeamHub,
                             initialSubject:
-                                'Re: ${_rootSubject(widget.message)}',
+                                'Re: ${_rootSubject(currentMessage)}',
+                            parentMessageId:
+                                widget.canUseTeamHub ? currentMessage.id : null,
                           ),
                         ),
                       );
@@ -1445,6 +1776,7 @@ class _ComposeMessagePage extends StatefulWidget {
     this.hubOnly = false,
     this.defaultToTeamHub = false,
     this.initialSubject = '',
+    this.parentMessageId,
   });
 
   final Color accent;
@@ -1452,6 +1784,7 @@ class _ComposeMessagePage extends StatefulWidget {
   final bool hubOnly;
   final bool defaultToTeamHub;
   final String initialSubject;
+  final String? parentMessageId;
 
   @override
   State<_ComposeMessagePage> createState() => _ComposeMessagePageState();
@@ -1487,6 +1820,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
         subject: subject,
         content: content,
         audience: _audience,
+        parentMessageId: widget.parentMessageId,
       ),
     );
   }
@@ -1693,11 +2027,13 @@ class _ComposeResult {
     required this.subject,
     required this.content,
     required this.audience,
+    this.parentMessageId,
   });
 
   final String subject;
   final String content;
   final _ComposeAudience audience;
+  final String? parentMessageId;
 }
 
 class _NoMessagesView extends StatelessWidget {
@@ -1789,16 +2125,17 @@ class _HubTopic {
 
   AppMessage get latest => comments.isEmpty ? root : comments.last;
   DateTime get latestAt => latest.sentAt;
-  int get commentCount => comments.length > 1 ? comments.length - 1 : 0;
+  int get commentCount => comments.length;
 }
 
 List<_HubTopic> _buildHubTopics(
   List<AppMessage> messages,
   String? membershipId,
 ) {
+  final byId = {for (final message in messages) message.id: message};
   final grouped = <String, List<AppMessage>>{};
   for (final message in messages) {
-    final key = _topicKey(message);
+    final key = _topicKey(message, byId);
     grouped.putIfAbsent(key, () => []).add(message);
   }
 
@@ -1806,13 +2143,11 @@ List<_HubTopic> _buildHubTopics(
     final thread = [...entry.value]
       ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
     final root = thread.firstWhere(
-      (message) => !_isReplySubject(message.subject),
+      (message) =>
+          message.parentMessageId == null && !_isReplySubject(message.subject),
       orElse: () => thread.first,
     );
-    final comments = [
-      root,
-      ...thread.where((message) => message.id != root.id),
-    ];
+    final comments = thread.where((message) => message.id != root.id).toList();
     return _HubTopic(
       key: entry.key,
       title: _rootSubject(root),
@@ -1829,7 +2164,15 @@ List<_HubTopic> _buildHubTopics(
   return topics;
 }
 
-String _topicKey(AppMessage message) {
+String _topicKey(AppMessage message, Map<String, AppMessage> byId) {
+  final parentId = message.parentMessageId;
+  if (parentId != null && parentId.trim().isNotEmpty) {
+    final root = byId[parentId];
+    if (root != null) return root.id;
+    final subject = _rootSubject(message).toLowerCase().trim();
+    if (subject.isNotEmpty) return subject;
+    return parentId;
+  }
   final subject = _rootSubject(message).toLowerCase().trim();
   if (subject.isNotEmpty) return subject;
   final firstLine = message.content

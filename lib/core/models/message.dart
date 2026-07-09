@@ -7,6 +7,8 @@ class AppMessage {
     this.subject = '',
     this.senderMemberId,
     this.recipientMemberId,
+    this.parentMessageId,
+    this.messageScope = 'direct',
     this.senderProfilePhotoUrl = '',
     this.isRead = false,
     this.reactionCounts = const {},
@@ -20,6 +22,8 @@ class AppMessage {
   final DateTime sentAt;
   final String? senderMemberId;
   final String? recipientMemberId;
+  final String? parentMessageId;
+  final String messageScope;
   final String senderProfilePhotoUrl;
   final bool isRead;
   final Map<String, int> reactionCounts;
@@ -39,6 +43,10 @@ class AppMessage {
           DateTime.now(),
       senderMemberId: json['sender_member_id'] as String?,
       recipientMemberId: json['recipient_member_id'] as String?,
+      parentMessageId: json['parent_message_id'] as String?,
+      messageScope: (json['message_scope'] as String?) ??
+          (json['messageScope'] as String?) ??
+          (json['parent_message_id'] == null ? 'direct' : 'comment'),
       senderProfilePhotoUrl: (json['sender_profile_photo_url'] as String?) ??
           (json['senderProfilePhotoUrl'] as String?) ??
           (json['sender_photo_url'] as String?) ??
@@ -61,6 +69,8 @@ class AppMessage {
         'created_at': sentAt.toIso8601String(),
         'sender_member_id': senderMemberId,
         'recipient_member_id': recipientMemberId,
+        'parent_message_id': parentMessageId,
+        'message_scope': messageScope,
         'sender_profile_photo_url': senderProfilePhotoUrl,
         'is_read': isRead,
         'reaction_counts': reactionCounts,

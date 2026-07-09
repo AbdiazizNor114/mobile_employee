@@ -226,6 +226,8 @@ class WorkerSyncService {
   Future<void> sendWorkerMessage({
     required String subject,
     required String content,
+    String? parentMessageId,
+    String? recipientMemberId,
     bool sendToAll = false,
     String recipientRole = 'manager',
   }) async {
@@ -239,7 +241,13 @@ class WorkerSyncService {
       data: {
         'subject': subject.trim().isEmpty ? 'Worker message' : subject.trim(),
         'content': content,
-        if (sendToAll) 'sendToAll': true else 'recipientRole': recipientRole,
+        if (parentMessageId != null) 'parentMessageId': parentMessageId,
+        if (recipientMemberId != null)
+          'recipientMemberId': recipientMemberId
+        else if (sendToAll)
+          'sendToAll': true
+        else
+          'recipientRole': recipientRole,
       },
     );
   }
