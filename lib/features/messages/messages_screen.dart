@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
@@ -32,6 +33,37 @@ String _messageTitle(AppMessage message, AppLocalizations l10n) {
   return firstLine.length > 72 ? '${firstLine.substring(0, 69)}...' : firstLine;
 }
 
+String _friendlySendError(BuildContext context, Object error) {
+  final fallback = AppLocalizations.of(context).couldNotPost;
+  if (error is DioException) {
+    final status = error.response?.statusCode;
+    final body = error.response?.data;
+    final serverMessage = body is Map ? body['error']?.toString() : null;
+    if (status == 401) return 'Please sign in again before sending.';
+    if (status == 403) {
+      return serverMessage?.isNotEmpty == true
+          ? serverMessage!
+          : 'You do not have permission to send this message.';
+    }
+    if (status == 404) {
+      return serverMessage?.isNotEmpty == true
+          ? serverMessage!
+          : 'No recipient was found for this message.';
+    }
+    if (status != null && status >= 500) {
+      return 'Server update is not ready yet. Please try again shortly.';
+    }
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
+      return 'Connection problem. Check internet and try again.';
+    }
+    if (serverMessage?.isNotEmpty == true) return serverMessage!;
+  }
+  return fallback;
+}
+
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
 
@@ -40,7 +72,6 @@ class MessagesScreen extends ConsumerStatefulWidget {
 }
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
-  _MessageFilter _filter = _MessageFilter.inbox;
   _HubSection _hubSection = _HubSection.direct;
   bool _isSending = false;
 
@@ -48,8 +79,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     return AppColors.primaryGreen;
   }
 
-  bool _canCompose(String plan) => plan == 'pro' || plan == 'enterprise';
-  bool _canUseTeamHub(String plan) => plan == 'enterprise';
+  bool _canCompose(String plan) => true;
+  bool _canUseTeamHub(String plan) => true;
 
   Future<void> _refreshMessages() async {
     ref.invalidate(backendSyncProvider);
@@ -80,6 +111,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       }
       await _refreshMessages();
       if (!mounted) return;
+      setState(() {
+        _hubSection = result.audience == _ComposeAudience.teamHub
+            ? _HubSection.feed
+            : _HubSection.direct;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -95,7 +131,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${AppLocalizations.of(context).couldNotPost}: $error'),
+          content: Text(_friendlySendError(context, error)),
         ),
       );
     } finally {
@@ -104,22 +140,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   }
 
   Future<void> _openComposer(String plan) async {
-    if (!_canCompose(plan)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).teamUpdatesReadOnly),
-        ),
-      );
-      return;
-    }
-
     final result = await Navigator.of(context).push<_ComposeResult>(
       MaterialPageRoute(
         builder: (context) => _ComposeMessagePage(
           accent: _accentForPlan(plan),
           canUseTeamHub: _canUseTeamHub(plan),
           contacts: ref.read(staffContactsProvider),
-          defaultToTeamHub: false,
+          defaultToTeamHub: _hubSection == _HubSection.feed,
         ),
       ),
     );
@@ -207,7 +234,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final plan = ref.watch(companyPlanProvider).toLowerCase();
     final membershipId = ref.watch(authServiceProvider).membershipId;
     final accent = _accentForPlan(plan);
-    final isEnterprise = plan == 'enterprise';
     final canCompose = _canCompose(plan);
     final contacts = ref.watch(staffContactsProvider);
     final unreadCount = messages
@@ -229,16 +255,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         .toList();
     final hubTopics = _buildHubTopics(hubMessages, membershipId);
 
-    final visibleMessages = messages.where((message) {
-      final isSent = message.senderMemberId == membershipId;
-      return switch (_filter) {
-        _MessageFilter.inbox => !isSent,
-        _MessageFilter.unread => !isSent && !message.isRead,
-        _MessageFilter.sent => isSent,
-        _MessageFilter.contacts => false,
-      };
-    }).toList();
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -248,137 +264,56 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             title: l10n.messages,
             isSending: _isSending,
             canCompose: canCompose,
-            isHub: isEnterprise,
+            isHub: true,
             unreadCount: unreadCount,
             onCompose: () => _openComposer(plan),
             onMarkAllRead: () => _markAllRead(messages, membershipId),
           ),
-          if (isEnterprise)
-            Container(
-              color: AppColors.cardBackground,
-              child: Row(
-                children: [
-                  _MailboxTab(
-                    label: 'DMs',
-                    isSelected: _hubSection == _HubSection.direct,
-                    accent: accent,
-                    onTap: () =>
-                        setState(() => _hubSection = _HubSection.direct),
-                  ),
-                  _MailboxTab(
-                    label: 'Posts',
-                    isSelected: _hubSection == _HubSection.feed,
-                    accent: accent,
-                    onTap: () => setState(() => _hubSection = _HubSection.feed),
-                  ),
-                  _MailboxTab(
-                    label: l10n.contacts,
-                    isSelected: _hubSection == _HubSection.contacts,
-                    accent: accent,
-                    onTap: () =>
-                        setState(() => _hubSection = _HubSection.contacts),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              color: AppColors.cardBackground,
-              child: Row(
-                children: [
-                  _MailboxTab(
-                    label: l10n.inbox,
-                    isSelected: _filter == _MessageFilter.inbox,
-                    accent: accent,
-                    onTap: () => setState(() => _filter = _MessageFilter.inbox),
-                  ),
-                  _MailboxTab(
-                    label: l10n.unreadWithCount(unreadCount),
-                    isSelected: _filter == _MessageFilter.unread,
-                    accent: accent,
-                    onTap: () =>
-                        setState(() => _filter = _MessageFilter.unread),
-                  ),
-                  _MailboxTab(
-                    label: l10n.sent,
-                    isSelected: _filter == _MessageFilter.sent,
-                    accent: accent,
-                    onTap: () => setState(() => _filter = _MessageFilter.sent),
-                  ),
-                  _MailboxTab(
-                    label: l10n.contacts,
-                    isSelected: _filter == _MessageFilter.contacts,
-                    accent: accent,
-                    onTap: () =>
-                        setState(() => _filter = _MessageFilter.contacts),
-                  ),
-                ],
-              ),
+          Container(
+            color: AppColors.cardBackground,
+            child: Row(
+              children: [
+                _MailboxTab(
+                  label: 'Messages',
+                  isSelected: _hubSection == _HubSection.direct,
+                  accent: accent,
+                  onTap: () => setState(() => _hubSection = _HubSection.direct),
+                ),
+                _MailboxTab(
+                  label: 'Posts',
+                  isSelected: _hubSection == _HubSection.feed,
+                  accent: accent,
+                  onTap: () => setState(() => _hubSection = _HubSection.feed),
+                ),
+                _MailboxTab(
+                  label: l10n.contacts,
+                  isSelected: _hubSection == _HubSection.contacts,
+                  accent: accent,
+                  onTap: () =>
+                      setState(() => _hubSection = _HubSection.contacts),
+                ),
+              ],
             ),
+          ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refreshMessages,
-              child: isEnterprise
-                  ? (_hubSection == _HubSection.contacts
-                      ? _ContactsList(contacts: contacts, accent: accent)
-                      : _hubSection == _HubSection.direct
-                          ? (directMessages.isEmpty
-                              ? const _NoMessagesView(
-                                  filter: _MessageFilter.inbox)
-                              : ListView.separated(
-                                  padding: EdgeInsets.zero,
-                                  itemCount: directMessages.length,
-                                  separatorBuilder: (context, index) =>
-                                      const Divider(
-                                          height: 1, color: AppColors.line),
-                                  itemBuilder: (context, index) {
-                                    final message = directMessages[index];
-                                    final isSent =
-                                        message.senderMemberId == membershipId;
-                                    return _MessageRow(
-                                      message: message,
-                                      isSent: isSent,
-                                      accent: accent,
-                                      onTap: () => _openMessage(
-                                        message: message,
-                                        isSent: isSent,
-                                        plan: 'pro',
-                                      ),
-                                    );
-                                  },
-                                ))
-                          : hubTopics.isEmpty
-                              ? const _EmptyHubView()
-                              : ListView.separated(
-                                  padding: EdgeInsets.zero,
-                                  itemCount: hubTopics.length,
-                                  separatorBuilder: (context, index) =>
-                                      const Divider(
-                                          height: 1, color: AppColors.line),
-                                  itemBuilder: (context, index) {
-                                    final topic = hubTopics[index];
-                                    return _HubTopicRow(
-                                      topic: topic,
-                                      accent: accent,
-                                      onTap: () => _openHubTopic(
-                                        topic: topic,
-                                        plan: plan,
-                                      ),
-                                    );
-                                  },
-                                ))
-                  : _filter == _MessageFilter.contacts
-                      ? _ContactsList(contacts: contacts, accent: accent)
-                      : visibleMessages.isEmpty
-                          ? _NoMessagesView(filter: _filter)
+              child: _hubSection == _HubSection.contacts
+                  ? _ContactsList(contacts: contacts, accent: accent)
+                  : _hubSection == _HubSection.direct
+                      ? (directMessages.isEmpty
+                          ? _NoMessagesView(
+                              filter: _MessageFilter.inbox,
+                              onAction: () => _openComposer(plan),
+                            )
                           : ListView.separated(
                               padding: EdgeInsets.zero,
-                              itemCount: visibleMessages.length,
+                              itemCount: directMessages.length,
                               separatorBuilder: (context, index) =>
                                   const Divider(
                                       height: 1, color: AppColors.line),
                               itemBuilder: (context, index) {
-                                final message = visibleMessages[index];
+                                final message = directMessages[index];
                                 final isSent =
                                     message.senderMemberId == membershipId;
                                 return _MessageRow(
@@ -388,6 +323,26 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                   onTap: () => _openMessage(
                                     message: message,
                                     isSent: isSent,
+                                    plan: 'pro',
+                                  ),
+                                );
+                              },
+                            ))
+                      : hubTopics.isEmpty
+                          ? _EmptyHubView(onAction: () => _openComposer(plan))
+                          : ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: hubTopics.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(
+                                      height: 1, color: AppColors.line),
+                              itemBuilder: (context, index) {
+                                final topic = hubTopics[index];
+                                return _HubTopicRow(
+                                  topic: topic,
+                                  accent: accent,
+                                  onTap: () => _openHubTopic(
+                                    topic: topic,
                                     plan: plan,
                                   ),
                                 );
@@ -1846,6 +1801,67 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
     );
   }
 
+  void _applyFormat(_FormatAction action) {
+    final selection = _contentController.selection;
+    final text = _contentController.text;
+    final start = selection.isValid ? selection.start : text.length;
+    final end = selection.isValid ? selection.end : text.length;
+    final selected = start == end ? '' : text.substring(start, end);
+
+    String next;
+    int cursorOffset;
+    switch (action) {
+      case _FormatAction.attach:
+        next = '[attachment]';
+        cursorOffset = next.length;
+      case _FormatAction.bold:
+        next = selected.isEmpty ? '**bold text**' : '**$selected**';
+        cursorOffset = selected.isEmpty ? 2 : next.length;
+      case _FormatAction.italic:
+        next = selected.isEmpty ? '_italic text_' : '_${selected}_';
+        cursorOffset = selected.isEmpty ? 1 : next.length;
+      case _FormatAction.strike:
+        next = selected.isEmpty ? '~~text~~' : '~~$selected~~';
+        cursorOffset = selected.isEmpty ? 2 : next.length;
+      case _FormatAction.link:
+        next = selected.isEmpty ? '[text](https://)' : '[$selected](https://)';
+        cursorOffset = selected.isEmpty ? 1 : next.length - 1;
+      case _FormatAction.heading:
+        next = selected.isEmpty ? '## Heading' : '## $selected';
+        cursorOffset = next.length;
+      case _FormatAction.quote:
+        next = selected.isEmpty
+            ? '> Quote'
+            : selected.split('\n').map((line) => '> $line').join('\n');
+        cursorOffset = next.length;
+      case _FormatAction.code:
+        next = selected.isEmpty ? '`code`' : '`$selected`';
+        cursorOffset = selected.isEmpty ? 1 : next.length;
+      case _FormatAction.bullets:
+        next = selected.isEmpty
+            ? '- List item'
+            : selected.split('\n').map((line) => '- ${line.trim()}').join('\n');
+        cursorOffset = next.length;
+      case _FormatAction.numbers:
+        if (selected.isEmpty) {
+          next = '1. List item';
+        } else {
+          var index = 0;
+          next = selected.split('\n').map((line) {
+            index += 1;
+            return '$index. ${line.trim()}';
+          }).join('\n');
+        }
+        cursorOffset = next.length;
+    }
+
+    _contentController.text = text.replaceRange(start, end, next);
+    final offset = start + cursorOffset;
+    _contentController.selection = TextSelection.collapsed(
+      offset: offset.clamp(0, _contentController.text.length).toInt(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1961,16 +1977,36 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
           Text(widget.hubOnly ? l10n.comment : l10n.message,
               style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _contentController,
-            minLines: 7,
-            maxLines: 12,
-            maxLength: 2000,
-            decoration: InputDecoration(
-              hintText:
-                  widget.hubOnly ? l10n.addHubComment : l10n.writeYourMessage,
-              filled: true,
-              fillColor: AppColors.cardBackground,
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              children: [
+                _FormatToolbar(
+                  onFormat: _applyFormat,
+                ),
+                const Divider(height: 1, color: AppColors.line),
+                TextField(
+                  controller: _contentController,
+                  minLines: 7,
+                  maxLines: 12,
+                  maxLength: 2000,
+                  decoration: InputDecoration(
+                    hintText: widget.hubOnly
+                        ? l10n.addHubComment
+                        : l10n.writeYourMessage,
+                    filled: true,
+                    fillColor: AppColors.cardBackground,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(AppSpacing.md),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -1987,6 +2023,136 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                         : 'Send private messages'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+enum _FormatAction {
+  attach,
+  bold,
+  italic,
+  strike,
+  link,
+  heading,
+  quote,
+  code,
+  bullets,
+  numbers,
+}
+
+class _FormatToolbar extends StatelessWidget {
+  const _FormatToolbar({
+    required this.onFormat,
+  });
+
+  final ValueChanged<_FormatAction> onFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xs,
+      ),
+      child: Row(
+        children: [
+          _FormatButton(
+            icon: Icons.attach_file_rounded,
+            tooltip: 'Attachment',
+            onTap: () => onFormat(_FormatAction.attach),
+          ),
+          _FormatButton(
+            label: 'B',
+            tooltip: 'Bold',
+            onTap: () => onFormat(_FormatAction.bold),
+          ),
+          _FormatButton(
+            label: 'I',
+            italic: true,
+            tooltip: 'Italic',
+            onTap: () => onFormat(_FormatAction.italic),
+          ),
+          _FormatButton(
+            icon: Icons.strikethrough_s_rounded,
+            tooltip: 'Strikethrough',
+            onTap: () => onFormat(_FormatAction.strike),
+          ),
+          _FormatButton(
+            icon: Icons.link_rounded,
+            tooltip: 'Link',
+            onTap: () => onFormat(_FormatAction.link),
+          ),
+          _FormatButton(
+            icon: Icons.title_rounded,
+            tooltip: 'Heading',
+            onTap: () => onFormat(_FormatAction.heading),
+          ),
+          _FormatButton(
+            icon: Icons.format_quote_rounded,
+            tooltip: 'Quote',
+            onTap: () => onFormat(_FormatAction.quote),
+          ),
+          _FormatButton(
+            icon: Icons.code_rounded,
+            tooltip: 'Code',
+            onTap: () => onFormat(_FormatAction.code),
+          ),
+          _FormatButton(
+            icon: Icons.format_list_bulleted_rounded,
+            tooltip: 'Bullet list',
+            onTap: () => onFormat(_FormatAction.bullets),
+          ),
+          _FormatButton(
+            icon: Icons.format_list_numbered_rounded,
+            tooltip: 'Numbered list',
+            onTap: () => onFormat(_FormatAction.numbers),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormatButton extends StatelessWidget {
+  const _FormatButton({
+    required this.tooltip,
+    required this.onTap,
+    this.icon,
+    this.label,
+    this.italic = false,
+  });
+
+  final IconData? icon;
+  final String? label;
+  final bool italic;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 38,
+          child: Center(
+            child: icon != null
+                ? Icon(icon, color: AppColors.darkText)
+                : Text(
+                    label ?? '',
+                    style: AppTypography.headingSmall.copyWith(
+                      color: AppColors.darkText,
+                      fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -2170,9 +2336,13 @@ class _ComposeResult {
 }
 
 class _NoMessagesView extends StatelessWidget {
-  const _NoMessagesView({required this.filter});
+  const _NoMessagesView({
+    required this.filter,
+    this.onAction,
+  });
 
   final _MessageFilter filter;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -2197,6 +2367,24 @@ class _NoMessagesView extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(label, style: AppTypography.headingMedium),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                filter == _MessageFilter.inbox
+                    ? 'Start a private message or pull down to refresh.'
+                    : 'Pull down to refresh this list.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.mutedText,
+                ),
+              ),
+              if (onAction != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                FilledButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Write message'),
+                ),
+              ],
             ],
           ),
         ),
@@ -2206,7 +2394,9 @@ class _NoMessagesView extends StatelessWidget {
 }
 
 class _EmptyHubView extends StatelessWidget {
-  const _EmptyHubView();
+  const _EmptyHubView({this.onAction});
+
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -2233,6 +2423,14 @@ class _EmptyHubView extends StatelessWidget {
                   color: AppColors.mutedText,
                 ),
               ),
+              if (onAction != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                FilledButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Create post'),
+                ),
+              ],
             ],
           ),
         ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
-import '../providers/service_providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 
 class ShaqoNetBottomNavBar extends ConsumerWidget {
@@ -21,9 +20,6 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final labels = AppLocalizations.of(context);
-    final isEnterpriseHub =
-        ref.watch(companyPlanProvider).toLowerCase() == 'enterprise';
-
     return NavigationBar(
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
@@ -53,18 +49,14 @@ class ShaqoNetBottomNavBar extends ConsumerWidget {
         ),
         NavigationDestination(
           icon: _NavIconWithBadge(
-            icon: isEnterpriseHub
-                ? Icons.forum_outlined
-                : Icons.chat_bubble_outline_rounded,
+            icon: Icons.forum_outlined,
             unreadCount: unreadMessageCount,
           ),
           selectedIcon: _NavIconWithBadge(
-            icon: isEnterpriseHub
-                ? Icons.forum_rounded
-                : Icons.chat_bubble_rounded,
+            icon: Icons.forum_rounded,
             unreadCount: unreadMessageCount,
           ),
-          label: isEnterpriseHub ? labels.hub : labels.messages,
+          label: labels.messages,
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline_rounded),

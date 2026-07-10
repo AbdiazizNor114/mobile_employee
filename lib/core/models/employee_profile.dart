@@ -142,7 +142,8 @@ class StaffContact {
   }
 
   String get initials {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    final source = name.trim().isNotEmpty ? name.trim() : displayName;
+    final parts = source.split(RegExp(r'[\s@._-]+')).where((p) => p.isNotEmpty);
     final value = parts.take(2).map((p) => p[0].toUpperCase()).join();
     return value.isEmpty ? 'SN' : value;
   }
