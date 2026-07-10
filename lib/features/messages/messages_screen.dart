@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
@@ -1015,6 +1016,54 @@ class _ContactDetailPage extends ConsumerWidget {
   final StaffContact contact;
   final Color accent;
 
+  Future<void> _launchContactUri(
+    BuildContext context,
+    Uri uri,
+    String fallback,
+  ) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(fallback)),
+      );
+    }
+  }
+
+  Future<void> _messageInApp(BuildContext context, WidgetRef ref) async {
+    final result = await Navigator.of(context).push<_ComposeResult>(
+      MaterialPageRoute(
+        builder: (context) => _ComposeMessagePage(
+          accent: accent,
+          canUseTeamHub: false,
+          contacts: [contact],
+        ),
+      ),
+    );
+    if (result == null || result.recipientMemberIds.isEmpty) return;
+
+    try {
+      final sync = ref.read(workerSyncServiceProvider);
+      for (final recipientId in result.recipientMemberIds) {
+        await sync.sendWorkerMessage(
+          subject: result.subject,
+          content: result.content,
+          recipientMemberId: recipientId,
+        );
+      }
+      ref.invalidate(backendSyncProvider);
+      await ref.read(backendSyncProvider.future);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message sent.')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlySendError(context, error))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final companyName = ref.watch(companyNameProvider);
@@ -1137,6 +1186,45 @@ class _ContactDetailPage extends ConsumerWidget {
                         color: AppColors.mutedText,
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        _ContactActionButton(
+                          icon: Icons.phone_outlined,
+                          label: 'Call',
+                          accent: accent,
+                          enabled: contact.phone.trim().isNotEmpty,
+                          onTap: () => _launchContactUri(
+                            context,
+                            Uri(scheme: 'tel', path: contact.phone.trim()),
+                            'Could not open phone.',
+                          ),
+                        ),
+                        _ContactActionButton(
+                          icon: Icons.mail_outline_rounded,
+                          label: 'Email',
+                          accent: accent,
+                          enabled: contact.email.trim().isNotEmpty,
+                          onTap: () => _launchContactUri(
+                            context,
+                            Uri(
+                              scheme: 'mailto',
+                              path: contact.email.trim(),
+                            ),
+                            'Could not open email.',
+                          ),
+                        ),
+                        _ContactActionButton(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          label: 'Message',
+                          accent: accent,
+                          onTap: () => _messageInApp(context, ref),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1158,6 +1246,41 @@ class _ContactDetailPage extends ConsumerWidget {
               accent: accent,
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _ContactActionButton extends StatelessWidget {
+  const _ContactActionButton({
+    required this.icon,
+    required this.label,
+    required this.accent,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled ? accent : AppColors.mutedText;
+    return OutlinedButton.icon(
+      onPressed: enabled ? onTap : null,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        side: BorderSide(color: enabled ? accent : AppColors.line),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
       ),
     );
   }
