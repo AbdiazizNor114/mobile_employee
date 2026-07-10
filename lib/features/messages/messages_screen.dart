@@ -64,6 +64,13 @@ String _friendlySendError(BuildContext context, Object error) {
   return fallback;
 }
 
+bool _isDirectMessage(AppMessage message) {
+  return message.messageScope == 'direct' ||
+      (message.messageScope != 'post' &&
+          message.messageScope != 'comment' &&
+          message.parentMessageId == null);
+}
+
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
 
@@ -80,7 +87,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   }
 
   bool _canCompose(String plan) => true;
-  bool _canUseTeamHub(String plan) => true;
+  bool _canUseTeamHub(String plan) => plan == 'enterprise';
+  bool _canPublishPosts(String plan, String role) {
+    return _canUseTeamHub(plan) &&
+        const {'company_owner', 'company_admin', 'manager'}.contains(role);
+  }
 
   Future<void> _refreshMessages() async {
     ref.invalidate(backendSyncProvider);
@@ -144,9 +155,16 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       MaterialPageRoute(
         builder: (context) => _ComposeMessagePage(
           accent: _accentForPlan(plan),
-          canUseTeamHub: _canUseTeamHub(plan),
+          canUseTeamHub: _canPublishPosts(
+            plan,
+            ref.read(employeeProfileProvider).companyRole,
+          ),
           contacts: ref.read(staffContactsProvider),
-          defaultToTeamHub: _hubSection == _HubSection.feed,
+          defaultToTeamHub: _hubSection == _HubSection.feed &&
+              _canPublishPosts(
+                plan,
+                ref.read(employeeProfileProvider).companyRole,
+              ),
         ),
       ),
     );
@@ -163,7 +181,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     }
 
     if (!mounted) return;
-    if (!_canUseTeamHub(plan)) {
+    if (_isDirectMessage(message)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
           builder: (context) => _DirectMessagePage(
@@ -210,7 +228,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           accent: _accentForPlan(plan),
           isSent: false,
           canReply: _canCompose(plan),
-          canUseTeamHub: true,
+          canUseTeamHub: _canUseTeamHub(plan),
         ),
       ),
     );
@@ -234,19 +252,16 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final plan = ref.watch(companyPlanProvider).toLowerCase();
     final membershipId = ref.watch(authServiceProvider).membershipId;
     final accent = _accentForPlan(plan);
+    final profile = ref.watch(employeeProfileProvider);
     final canCompose = _canCompose(plan);
+    final canUsePosts = _canUseTeamHub(plan);
+    final canPublishPosts = _canPublishPosts(plan, profile.companyRole);
     final contacts = ref.watch(staffContactsProvider);
     final unreadCount = messages
         .where((message) =>
             message.senderMemberId != membershipId && !message.isRead)
         .length;
-    final directMessages = messages
-        .where((message) =>
-            message.messageScope == 'direct' ||
-            (message.messageScope != 'post' &&
-                message.messageScope != 'comment' &&
-                message.parentMessageId == null))
-        .toList();
+    final directMessages = messages.where(_isDirectMessage).toList();
     final hubMessages = messages
         .where((message) =>
             message.messageScope == 'post' ||
@@ -264,7 +279,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             title: l10n.messages,
             isSending: _isSending,
             canCompose: canCompose,
-            isHub: true,
+            isHub: _hubSection == _HubSection.feed && canPublishPosts,
             unreadCount: unreadCount,
             onCompose: () => _openComposer(plan),
             onMarkAllRead: () => _markAllRead(messages, membershipId),
@@ -329,7 +344,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                               },
                             ))
                       : hubTopics.isEmpty
-                          ? _EmptyHubView(onAction: () => _openComposer(plan))
+                          ? _EmptyHubView(
+                              isEnterprise: canUsePosts,
+                              canCreatePost: canPublishPosts,
+                              onAction: canPublishPosts
+                                  ? () => _openComposer(plan)
+                                  : null,
+                            )
                           : ListView.separated(
                               padding: EdgeInsets.zero,
                               itemCount: hubTopics.length,
@@ -2394,8 +2415,14 @@ class _NoMessagesView extends StatelessWidget {
 }
 
 class _EmptyHubView extends StatelessWidget {
-  const _EmptyHubView({this.onAction});
+  const _EmptyHubView({
+    required this.isEnterprise,
+    required this.canCreatePost,
+    this.onAction,
+  });
 
+  final bool isEnterprise;
+  final bool canCreatePost;
   final VoidCallback? onAction;
 
   @override
@@ -2414,10 +2441,17 @@ class _EmptyHubView extends StatelessWidget {
                 size: 42,
               ),
               const SizedBox(height: AppSpacing.md),
-              Text(l10n.noHubPostsYet, style: AppTypography.headingMedium),
+              Text(
+                isEnterprise ? l10n.noHubPostsYet : 'Posts are Enterprise',
+                style: AppTypography.headingMedium,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                l10n.noHubPostsSubtitle,
+                isEnterprise
+                    ? (canCreatePost
+                        ? l10n.noHubPostsSubtitle
+                        : 'Managers and admins can publish posts here. Workers can read and comment.')
+                    : 'Private messages work on this plan. Announcement posts and comments unlock on Enterprise.',
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.mutedText,
