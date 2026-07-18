@@ -166,8 +166,5 @@ final resetWorkDataProvider = Provider<void Function()>((ref) {
 
 final appBootstrapProvider = FutureProvider<void>((ref) async {
   await ref.read(storageServiceProvider).initialize();
-  ref
-      .read(apiServiceProvider)
-      .setUnauthorizedCallback(() => ref.read(signOutProvider)());
   ref.read(authServiceProvider);
 });

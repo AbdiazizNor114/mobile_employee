@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
-import '../providers/mock_work_provider.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class OfflineCacheBanner extends ConsumerWidget {
   const OfflineCacheBanner({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final lastUpdated = ref.watch(cacheLastUpdatedProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -24,7 +24,7 @@ class OfflineCacheBanner extends ConsumerWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              'Synced data • ${_lastUpdatedLabel(lastUpdated)}',
+              l10n.offlineReady,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.darkText,
                 fontWeight: FontWeight.w800,
@@ -35,18 +35,4 @@ class OfflineCacheBanner extends ConsumerWidget {
       ),
     );
   }
-}
-
-String _lastUpdatedLabel(DateTime? value) {
-  if (value == null) return 'Caching now';
-
-  final difference = DateTime.now().difference(value);
-  if (difference.inMinutes < 1) return 'Last updated just now';
-  if (difference.inMinutes < 60) {
-    return 'Last updated ${difference.inMinutes} min ago';
-  }
-  if (difference.inHours < 24) {
-    return 'Last updated ${difference.inHours} h ago';
-  }
-  return 'Last updated ${difference.inDays} d ago';
 }

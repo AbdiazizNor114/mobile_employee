@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
@@ -72,11 +73,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.receiveTimeout) {
           message = l10n.serverUnreachable;
+        } else if (status == 401 || status == 404) {
+          message = _accountNotFoundMessage;
         } else if (status != null) {
           message = l10n.signInFailedWithStatus(status);
         }
         if (data is Map && data['error'] is String) {
-          message = data['error'] as String;
+          message = _loginErrorMessage(data['error'] as String, message);
         }
       }
       setState(() {
@@ -107,13 +110,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Spacer(),
-                    Text(
-                      l10n.appTitle,
-                      style: AppTypography.headingLarge.copyWith(
-                        color: AppColors.darkText,
+                    Center(
+                      child: SvgPicture.asset(
+                        'assets/logos/shaqonet-stacked-dark.svg',
+                        width: 190,
+                        semanticsLabel: l10n.appTitle,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: AppSpacing.xxl),
                     Text(l10n.loginTitle, style: AppTypography.headingLarge),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -158,14 +162,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                          color: AppColors.greenSoft,
-                          borderRadius: BorderRadius.circular(18),
+                          color: const Color(0xFFFFE8E1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFFFFB7A8),
+                          ),
                         ),
                         child: Text(
                           _message!,
-                          textAlign: TextAlign.center,
                           style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.mutedText,
+                            color: const Color(0xFFC43C24),
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -180,4 +187,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+}
+
+const _accountNotFoundMessage =
+    'We could not find a ShaqoNet account for those details. If your company uses ShaqoNet, ask your manager to invite you first or check the email and password.';
+
+String _loginErrorMessage(String serverError, String fallback) {
+  final normalized = serverError.toLowerCase();
+  if (normalized.contains('user does not exist') ||
+      normalized.contains('invalid') ||
+      normalized.contains('not found') ||
+      normalized.contains('membership')) {
+    return _accountNotFoundMessage;
+  }
+  if (serverError.contains('Smartplan')) {
+    return serverError
+        .replaceAll('Smartplan', 'ShaqoNet')
+        .replaceAll('SmartPlan', 'ShaqoNet');
+  }
+  return serverError.trim().isEmpty ? fallback : serverError;
 }

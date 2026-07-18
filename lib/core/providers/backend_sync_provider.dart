@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/employee_profile.dart';
 import '../models/message.dart';
@@ -45,11 +46,31 @@ final backendSyncProvider = FutureProvider<void>((ref) async {
   } on StateError catch (_) {
     // Missing IDs, likely signing out
   } catch (error) {
-    ref.read(lastSyncErrorProvider.notifier).state =
-        'Sync failed. Pull to refresh and try again.';
+    final hasCachedWork = _hasCachedWork(ref);
+    ref.read(lastSyncErrorProvider.notifier).state = _syncErrorMessage(error);
+    if (hasCachedWork) return;
     rethrow;
   }
 });
+
+bool _hasCachedWork(Ref ref) {
+  final profile = ref.read(employeeProfileProvider);
+  if (profile.firstName.trim().isNotEmpty || profile.email.trim().isNotEmpty) {
+    return true;
+  }
+  final storage = ref.read(storageServiceProvider);
+  return storage.readProfile() != null ||
+      (storage.readShifts()?.isNotEmpty ?? false) ||
+      (storage.readMessages()?.isNotEmpty ?? false) ||
+      (storage.readActivities()?.isNotEmpty ?? false);
+}
+
+String _syncErrorMessage(Object error) {
+  if (error is DioException && error.response?.statusCode == 401) {
+    return 'Showing saved work. Connect and retry if new updates do not appear.';
+  }
+  return 'Showing saved work. Connect to refresh when you can.';
+}
 
 List<StaffContact> _enrichContacts(
   List<StaffContact> contacts,

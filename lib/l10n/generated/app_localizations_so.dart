@@ -136,10 +136,11 @@ class AppLocalizationsSo extends AppLocalizations {
   String get logout => 'Ka bax';
 
   @override
-  String get offlineReady => 'Xogta shaqada waa la kaydiyay';
+  String get offlineReady =>
+      'Xogta shaqada waa kuu kaydsan tahay marka internet maqan yahay';
 
   @override
-  String get lastUpdated => 'Hadda la cusboonaysiiyay';
+  String get lastUpdated => 'Hadda la kaydiyay';
 
   @override
   String get role => 'Doorka';

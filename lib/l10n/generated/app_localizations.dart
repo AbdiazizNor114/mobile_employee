@@ -337,13 +337,13 @@ abstract class AppLocalizations {
   /// No description provided for @offlineReady.
   ///
   /// In en, this message translates to:
-  /// **'Offline-ready synced data'**
+  /// **'Saved work is available offline'**
   String get offlineReady;
 
   /// No description provided for @lastUpdated.
   ///
   /// In en, this message translates to:
-  /// **'Last updated just now'**
+  /// **'Saved just now'**
   String get lastUpdated;
 
   /// No description provided for @role.

@@ -133,10 +133,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logout => 'Logout';
 
   @override
-  String get offlineReady => 'Offline-ready synced data';
+  String get offlineReady => 'Saved work is available offline';
 
   @override
-  String get lastUpdated => 'Last updated just now';
+  String get lastUpdated => 'Saved just now';
 
   @override
   String get role => 'Role';

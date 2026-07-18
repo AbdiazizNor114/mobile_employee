@@ -135,10 +135,11 @@ class AppLocalizationsSw extends AppLocalizations {
   String get logout => 'Toka';
 
   @override
-  String get offlineReady => 'Taarifa za kazi zimehifadhiwa';
+  String get offlineReady =>
+      'Taarifa za kazi zimehifadhiwa kwa matumizi bila intaneti';
 
   @override
-  String get lastUpdated => 'Imesasishwa sasa hivi';
+  String get lastUpdated => 'Imehifadhiwa sasa hivi';
 
   @override
   String get role => 'Wajibu';
