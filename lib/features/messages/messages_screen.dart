@@ -110,6 +110,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           content: result.content,
           parentMessageId: result.parentMessageId,
           sendToAll: true,
+          messageScope: result.parentMessageId == null ? 'post' : 'comment',
         );
       } else {
         for (final recipientId in result.recipientMemberIds) {
@@ -152,6 +153,18 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   }
 
   Future<void> _openComposer(String plan) async {
+    var dmRecipients = ref.read(staffContactsProvider);
+    try {
+      dmRecipients =
+          await ref.read(workerSyncServiceProvider).fetchDirectMessageRecipients();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_friendlySendError(context, error))),
+        );
+      }
+    }
+    if (!mounted) return;
     final result = await Navigator.of(context).push<_ComposeResult>(
       MaterialPageRoute(
         builder: (context) => _ComposeMessagePage(
@@ -160,7 +173,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             plan,
             ref.read(employeeProfileProvider).companyRole,
           ),
-          contacts: ref.read(staffContactsProvider),
+          contacts: dmRecipients,
           defaultToTeamHub: _hubSection == _HubSection.feed &&
               _canPublishPosts(
                 plan,
@@ -2550,8 +2563,6 @@ class _EmptyHubView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
     return ListView(
       children: [
         Padding(
@@ -2565,16 +2576,17 @@ class _EmptyHubView extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                isEnterprise ? l10n.noHubPostsYet : 'Posts are Enterprise',
+                isEnterprise ? 'No posts yet.' : 'Posts and announcements are available on the Enterprise plan.',
                 style: AppTypography.headingMedium,
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 isEnterprise
                     ? (canCreatePost
-                        ? l10n.noHubPostsSubtitle
-                        : 'Managers and admins can publish posts here. Workers can read and comment.')
-                    : 'Private messages work on this plan. Announcement posts and comments unlock on Enterprise.',
+                        ? 'No posts yet. Create the first announcement for your team.'
+                        : 'No posts yet. Managers and admins can publish announcements here.')
+                    : 'Posts and announcements are available on the Enterprise plan. You can continue using private messages.',
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.mutedText,

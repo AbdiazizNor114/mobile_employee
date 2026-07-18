@@ -223,6 +223,24 @@ class WorkerSyncService {
     );
   }
 
+  Future<List<StaffContact>> fetchDirectMessageRecipients({
+    String search = '',
+  }) async {
+    final companyId = _authService.companyId;
+    if (companyId == null) {
+      throw StateError('Missing company context.');
+    }
+
+    final query = search.trim().isEmpty
+        ? ''
+        : '?q=${Uri.encodeQueryComponent(search.trim())}';
+    final response = await _apiService.client.get<Map<String, dynamic>>(
+      '/api/v1/companies/$companyId/employees/dm-recipients$query',
+    );
+    final raw = (response.data?['data'] as List?) ?? const [];
+    return raw.whereType<Map>().map(_mapStaffContact).toList();
+  }
+
   Future<void> sendWorkerMessage({
     required String subject,
     required String content,
@@ -230,6 +248,7 @@ class WorkerSyncService {
     String? recipientMemberId,
     bool sendToAll = false,
     String recipientRole = 'manager',
+    String? messageScope,
   }) async {
     final companyId = _authService.companyId;
     if (companyId == null) {
@@ -241,6 +260,7 @@ class WorkerSyncService {
       data: {
         'subject': subject.trim().isEmpty ? 'Worker message' : subject.trim(),
         'content': content,
+        if (messageScope != null) 'messageScope': messageScope,
         if (parentMessageId != null) 'parentMessageId': parentMessageId,
         if (recipientMemberId != null)
           'recipientMemberId': recipientMemberId
