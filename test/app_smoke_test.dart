@@ -18,7 +18,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('ShaqoNet'), findsOneWidget);
+    expect(find.bySemanticsLabel('ShaqoNet'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));
 

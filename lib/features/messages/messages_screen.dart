@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
@@ -20,18 +26,142 @@ enum _HubSection { direct, feed, contacts }
 
 enum _ComposeAudience { contacts, teamHub }
 
+const _maxAttachmentCount = 3;
+const _maxAttachmentBytes = 1024 * 1024;
+
+class _ComposerAttachment {
+  const _ComposerAttachment({
+    required this.name,
+    required this.size,
+    required this.dataUrl,
+  });
+
+  final String name;
+  final int size;
+  final String dataUrl;
+}
+
+class _MessageAttachment {
+  const _MessageAttachment({
+    required this.label,
+    required this.url,
+  });
+
+  final String label;
+  final String url;
+}
+
+class _ParsedMessageContent {
+  const _ParsedMessageContent({
+    required this.text,
+    required this.attachments,
+  });
+
+  final String text;
+  final List<_MessageAttachment> attachments;
+}
+
 String _messageTitle(AppMessage message, AppLocalizations l10n) {
   final subject = message.subject.trim();
   if (subject.isNotEmpty && subject.toLowerCase() != 'team update') {
     return subject;
   }
-  final firstLine = message.content
+  final preview = _messagePreview(message.content);
+  final firstLine = preview
       .split('\n')
       .map((line) => line.trim())
       .where((line) => line.isNotEmpty)
       .firstOrNull;
   if (firstLine == null) return l10n.message;
   return firstLine.length > 72 ? '${firstLine.substring(0, 69)}...' : firstLine;
+}
+
+String _messagePreview(String content) {
+  final parsed = _parseMessageContent(content);
+  final text = parsed.text.trim();
+  if (text.isNotEmpty) return text;
+  if (parsed.attachments.isNotEmpty) {
+    return '${parsed.attachments.length} attachment${parsed.attachments.length == 1 ? '' : 's'}';
+  }
+  return content;
+}
+
+String _formatFileSize(int size) {
+  if (size < 1024) return '$size B';
+  if (size < 1024 * 1024) {
+    return '${(size / 1024).toStringAsFixed(size < 1024 * 100 ? 1 : 0)} KB';
+  }
+  return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+String _safeAttachmentName(String value) {
+  final cleaned = value.replaceAll(RegExp(r'[\[\]\n\r]'), '').trim();
+  return cleaned.isEmpty ? 'Attachment' : cleaned;
+}
+
+String _mimeTypeForExtension(String? extension) {
+  return switch (extension?.toLowerCase()) {
+    'pdf' => 'application/pdf',
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'png' => 'image/png',
+    'txt' => 'text/plain',
+    'csv' => 'text/csv',
+    'doc' => 'application/msword',
+    'docx' =>
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls' => 'application/vnd.ms-excel',
+    'xlsx' =>
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    _ => 'application/octet-stream',
+  };
+}
+
+String _attachmentMarkdown(List<_ComposerAttachment> attachments) {
+  if (attachments.isEmpty) return '';
+  final lines = attachments.map((attachment) {
+    final label =
+        '${_safeAttachmentName(attachment.name)} (${_formatFileSize(attachment.size)})';
+    return '- [$label](${attachment.dataUrl})';
+  }).join('\n');
+  return 'Attachments:\n$lines';
+}
+
+String _contentWithAttachments(
+  String content,
+  List<_ComposerAttachment> attachments,
+) {
+  final body = content.trim();
+  final attachmentText = _attachmentMarkdown(attachments);
+  return [body, attachmentText].where((part) => part.isNotEmpty).join('\n\n');
+}
+
+_ParsedMessageContent _parseMessageContent(String content) {
+  final attachments = <_MessageAttachment>[];
+  final bodyLines = <String>[];
+  final attachmentPattern = RegExp(r'^\s*-\s*\[([^\]]+)\]\(([^)]+)\)\s*$');
+  var inAttachmentBlock = false;
+
+  for (final line in content.split('\n')) {
+    if (line.trim().toLowerCase() == 'attachments:') {
+      inAttachmentBlock = true;
+      continue;
+    }
+    final match = attachmentPattern.firstMatch(line);
+    if (inAttachmentBlock && match != null) {
+      attachments.add(_MessageAttachment(
+        label: match.group(1) ?? 'Attachment',
+        url: match.group(2) ?? '',
+      ));
+      continue;
+    }
+    if (inAttachmentBlock && line.trim().isEmpty) continue;
+    bodyLines.add(line);
+  }
+
+  return _ParsedMessageContent(
+    text: bodyLines.join('\n').trim(),
+    attachments: attachments,
+  );
 }
 
 String _friendlySendError(BuildContext context, Object error) {
@@ -153,8 +283,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   Future<void> _openComposer(String plan) async {
     var dmRecipients = ref.read(staffContactsProvider);
     try {
-      dmRecipients =
-          await ref.read(workerSyncServiceProvider).fetchDirectMessageRecipients();
+      dmRecipients = await ref
+          .read(workerSyncServiceProvider)
+          .fetchDirectMessageRecipients();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -728,7 +859,7 @@ class _MessageRow extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      message.content,
+                      _messagePreview(message.content),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.bodyMedium.copyWith(
@@ -760,9 +891,11 @@ class _HubTopicRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unread = topic.unreadCount > 0;
-    final preview = topic.latest.id == topic.root.id
-        ? topic.root.content
-        : topic.latest.content;
+    final preview = _messagePreview(
+      topic.latest.id == topic.root.id
+          ? topic.root.content
+          : topic.latest.content,
+    );
 
     return Material(
       color: AppColors.cardBackground,
@@ -1582,12 +1715,14 @@ class _DmBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content,
-                    style: AppTypography.bodyMedium.copyWith(
+                  _MessageContentView(
+                    content: message.content,
+                    textStyle: AppTypography.bodyMedium.copyWith(
                       color: textColor,
                       height: 1.35,
                     ),
+                    accent: accent,
+                    inverted: isMine,
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -1822,6 +1957,162 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
   }
 }
 
+class _MessageContentView extends StatelessWidget {
+  const _MessageContentView({
+    required this.content,
+    required this.textStyle,
+    required this.accent,
+    this.inverted = false,
+  });
+
+  final String content;
+  final TextStyle textStyle;
+  final Color accent;
+  final bool inverted;
+
+  Future<void> _openAttachment(
+    BuildContext context,
+    _MessageAttachment attachment,
+  ) async {
+    final rawUrl = attachment.url.trim();
+    try {
+      if (rawUrl.startsWith('data:')) {
+        await _openDataAttachment(attachment);
+        return;
+      }
+
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+        final opened = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (opened) return;
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this attachment.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this attachment.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openDataAttachment(_MessageAttachment attachment) async {
+    final commaIndex = attachment.url.indexOf(',');
+    if (commaIndex < 0) throw const FormatException('Invalid attachment data.');
+    final metadata = attachment.url.substring(0, commaIndex);
+    final payload = attachment.url.substring(commaIndex + 1);
+    final bytes = metadata.contains(';base64')
+        ? base64Decode(payload)
+        : utf8.encode(Uri.decodeComponent(payload));
+    final cacheDir = await getTemporaryDirectory();
+    final filename = _attachmentFilename(attachment.label, metadata);
+    final file = File('${cacheDir.path}/$filename');
+    await file.writeAsBytes(bytes, flush: true);
+    await OpenFilex.open(file.path);
+  }
+
+  String _attachmentFilename(String label, String metadata) {
+    final withoutSize = label.replaceFirst(RegExp(r'\s*\([^)]+\)\s*$'), '');
+    var safe = withoutSize.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
+    safe = safe.replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
+    if (safe.isEmpty) safe = 'attachment';
+    if (!safe.contains('.')) {
+      final mime = metadata.split(';').first.replaceFirst('data:', '');
+      final extension = switch (mime) {
+        'application/pdf' => 'pdf',
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'text/plain' => 'txt',
+        _ => 'bin',
+      };
+      safe = '$safe.$extension';
+    }
+    return safe;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final parsed = _parseMessageContent(content);
+    final text = parsed.text.trim();
+    final attachmentColor =
+        inverted ? AppColors.cardBackground : AppColors.primaryGreenDark;
+    final attachmentBackground = inverted
+        ? AppColors.cardBackground.withValues(alpha: 0.16)
+        : accent.withValues(alpha: 0.10);
+    final attachmentBorder = inverted
+        ? AppColors.cardBackground.withValues(alpha: 0.28)
+        : accent.withValues(alpha: 0.25);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (text.isNotEmpty)
+          Text(
+            text,
+            style: textStyle,
+          ),
+        if (parsed.attachments.isNotEmpty) ...[
+          if (text.isNotEmpty) const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: parsed.attachments
+                .map(
+                  (attachment) => InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => _openAttachment(context, attachment),
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: attachmentBackground,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: attachmentBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.attach_file_rounded,
+                            color: attachmentColor,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              attachment.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.caption.copyWith(
+                                color: attachmentColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _ThreadMessageCard extends StatelessWidget {
   const _ThreadMessageCard({
     required this.message,
@@ -1912,12 +2203,13 @@ class _ThreadMessageCard extends StatelessWidget {
             const Divider(color: AppColors.line),
           ],
           const SizedBox(height: AppSpacing.md),
-          Text(
-            message.content,
-            style: AppTypography.bodyLarge.copyWith(
+          _MessageContentView(
+            content: message.content,
+            textStyle: AppTypography.bodyLarge.copyWith(
               color: AppColors.darkText,
               height: 1.55,
             ),
+            accent: accent,
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -1980,6 +2272,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
   final _contentController = TextEditingController();
   late _ComposeAudience _audience;
   final Set<String> _selectedContactIds = <String>{};
+  final List<_ComposerAttachment> _attachments = [];
 
   @override
   void initState() {
@@ -2002,7 +2295,10 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
 
   void _submit() {
     final subject = _subjectController.text.trim();
-    final content = _contentController.text.trim();
+    final content = _contentWithAttachments(
+      _contentController.text,
+      _attachments,
+    );
     if (subject.isEmpty || content.isEmpty) return;
     if (_audience == _ComposeAudience.contacts && _selectedContactIds.isEmpty) {
       return;
@@ -2017,7 +2313,71 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
     );
   }
 
+  Future<void> _pickAttachment() async {
+    final remaining = _maxAttachmentCount - _attachments.length;
+    if (remaining <= 0) {
+      _showComposerMessage(
+        'You can attach up to $_maxAttachmentCount files per message.',
+      );
+      return;
+    }
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: true,
+      );
+      if (result == null) return;
+
+      final files = result.files.take(remaining).toList();
+      final oversized =
+          files.where((file) => file.size > _maxAttachmentBytes).firstOrNull;
+      if (oversized != null) {
+        _showComposerMessage(
+          '${oversized.name} is too large. Attach files up to ${_formatFileSize(_maxAttachmentBytes)}.',
+        );
+        return;
+      }
+
+      final nextAttachments = <_ComposerAttachment>[];
+      for (final file in files) {
+        final bytes = file.bytes;
+        if (bytes == null) continue;
+        final mimeType = _mimeTypeForExtension(file.extension);
+        nextAttachments.add(_ComposerAttachment(
+          name: file.name,
+          size: file.size,
+          dataUrl: 'data:$mimeType;base64,${base64Encode(bytes)}',
+        ));
+      }
+      if (nextAttachments.isEmpty) {
+        _showComposerMessage('Could not read the selected file.');
+        return;
+      }
+      setState(() => _attachments.addAll(nextAttachments));
+      if (result.files.length > files.length) {
+        _showComposerMessage(
+          'Only $_maxAttachmentCount files can be attached to one message.',
+        );
+      }
+    } catch (_) {
+      _showComposerMessage('Could not attach the selected file.');
+    }
+  }
+
+  void _showComposerMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   void _applyFormat(_FormatAction action) {
+    if (action == _FormatAction.attach) {
+      _pickAttachment();
+      return;
+    }
+
     final selection = _contentController.selection;
     final text = _contentController.text;
     final start = selection.isValid ? selection.start : text.length;
@@ -2028,8 +2388,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
     int cursorOffset;
     switch (action) {
       case _FormatAction.attach:
-        next = '[attachment]';
-        cursorOffset = next.length;
+        return;
       case _FormatAction.bold:
         next = selected.isEmpty ? '**bold text**' : '**$selected**';
         cursorOffset = selected.isEmpty ? 2 : next.length;
@@ -2194,8 +2553,17 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
               children: [
                 _FormatToolbar(
                   onFormat: _applyFormat,
+                  attachmentCount: _attachments.length,
                 ),
                 const Divider(height: 1, color: AppColors.line),
+                if (_attachments.isNotEmpty)
+                  _AttachmentComposerList(
+                    attachments: _attachments,
+                    accent: widget.accent,
+                    onRemove: (attachment) {
+                      setState(() => _attachments.remove(attachment));
+                    },
+                  ),
                 TextField(
                   controller: _contentController,
                   minLines: 7,
@@ -2221,10 +2589,10 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                 ? Icons.forum_outlined
                 : Icons.send_rounded),
             label: Text(_audience == _ComposeAudience.teamHub
-                    ? l10n.postToHub
-                    : _selectedContactIds.length == 1
-                        ? l10n.sendPrivateText
-                        : 'Send private messages'),
+                ? l10n.postToHub
+                : _selectedContactIds.length == 1
+                    ? l10n.sendPrivateText
+                    : 'Send private messages'),
           ),
         ],
       ),
@@ -2248,9 +2616,11 @@ enum _FormatAction {
 class _FormatToolbar extends StatelessWidget {
   const _FormatToolbar({
     required this.onFormat,
+    this.attachmentCount = 0,
   });
 
   final ValueChanged<_FormatAction> onFormat;
+  final int attachmentCount;
 
   @override
   Widget build(BuildContext context) {
@@ -2264,7 +2634,9 @@ class _FormatToolbar extends StatelessWidget {
         children: [
           _FormatButton(
             icon: Icons.attach_file_rounded,
-            tooltip: 'Attachment',
+            label: attachmentCount > 0 ? '$attachmentCount' : null,
+            tooltip: 'Attach file',
+            highlighted: attachmentCount > 0,
             onTap: () => onFormat(_FormatAction.attach),
           ),
           _FormatButton(
@@ -2326,11 +2698,13 @@ class _FormatButton extends StatelessWidget {
     this.icon,
     this.label,
     this.italic = false,
+    this.highlighted = false,
   });
 
   final IconData? icon;
   final String? label;
   final bool italic;
+  final bool highlighted;
   final String tooltip;
   final VoidCallback onTap;
 
@@ -2341,12 +2715,39 @@ class _FormatButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: onTap,
-        child: SizedBox(
-          width: 42,
+        child: Container(
+          width: label != null && icon != null ? 52 : 42,
           height: 38,
+          decoration: BoxDecoration(
+            color: highlighted
+                ? AppColors.primaryGreen.withValues(alpha: 0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
           child: Center(
             child: icon != null
-                ? Icon(icon, color: AppColors.darkText)
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        icon,
+                        color: highlighted
+                            ? AppColors.primaryGreenDark
+                            : AppColors.darkText,
+                      ),
+                      if (label != null) ...[
+                        const SizedBox(width: 2),
+                        Text(
+                          label!,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.primaryGreenDark,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
                 : Text(
                     label ?? '',
                     style: AppTypography.headingSmall.copyWith(
@@ -2357,6 +2758,81 @@ class _FormatButton extends StatelessWidget {
                   ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AttachmentComposerList extends StatelessWidget {
+  const _AttachmentComposerList({
+    required this.attachments,
+    required this.accent,
+    required this.onRemove,
+  });
+
+  final List<_ComposerAttachment> attachments;
+  final Color accent;
+  final ValueChanged<_ComposerAttachment> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        0,
+      ),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: attachments
+            .map(
+              (attachment) => Container(
+                constraints: const BoxConstraints(maxWidth: 260),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: accent.withValues(alpha: 0.28)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.attach_file_rounded, color: accent, size: 16),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${attachment.name} • ${_formatFileSize(attachment.size)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.darkText,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => onRemove(attachment),
+                      borderRadius: BorderRadius.circular(999),
+                      child: const Padding(
+                        padding: EdgeInsets.all(3),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: AppColors.mutedText,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -2621,7 +3097,9 @@ class _EmptyHubView extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                isEnterprise ? 'No posts yet.' : 'Posts and announcements are available on the Enterprise plan.',
+                isEnterprise
+                    ? 'No posts yet.'
+                    : 'Posts and announcements are available on the Enterprise plan.',
                 style: AppTypography.headingMedium,
                 textAlign: TextAlign.center,
               ),
