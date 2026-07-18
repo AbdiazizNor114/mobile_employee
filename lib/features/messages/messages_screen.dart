@@ -108,16 +108,14 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         await sync.sendWorkerMessage(
           subject: result.subject,
           content: result.content,
-          parentMessageId: result.parentMessageId,
           sendToAll: true,
-          messageScope: result.parentMessageId == null ? 'post' : 'comment',
+          messageScope: 'post',
         );
       } else {
         for (final recipientId in result.recipientMemberIds) {
           await sync.sendWorkerMessage(
             subject: result.subject,
             content: result.content,
-            parentMessageId: result.parentMessageId,
             recipientMemberId: recipientId,
           );
         }
@@ -1632,6 +1630,41 @@ class _MessageDetailPage extends ConsumerStatefulWidget {
 }
 
 class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
+  final _commentController = TextEditingController();
+  bool _sendingComment = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendComment(AppMessage post) async {
+    final content = _commentController.text.trim();
+    if (content.isEmpty || _sendingComment) return;
+
+    setState(() => _sendingComment = true);
+    try {
+      await ref.read(workerSyncServiceProvider).sendWorkerMessage(
+            subject: 'Re: ${_rootSubject(post)}',
+            content: content,
+            parentMessageId: post.id,
+            sendToAll: true,
+            messageScope: 'comment',
+          );
+      _commentController.clear();
+      ref.invalidate(backendSyncProvider);
+      await ref.read(backendSyncProvider.future);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlySendError(context, error))),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingComment = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1661,94 +1694,127 @@ class _MessageDetailPageState extends ConsumerState<_MessageDetailPage> {
                   : l10n.messageFrom(widget.message.senderName)),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+      body: Column(
         children: [
-          _ThreadMessageCard(
-            message: currentMessage,
-            accent: widget.accent,
-            title: _messageTitle(currentMessage, l10n),
-            authorLabel: widget.isSent ? l10n.you : currentMessage.senderName,
-            onReact: (emoji) async {
-              await ref
-                  .read(messagesProvider.notifier)
-                  .toggleReaction(currentMessage.id, emoji);
-              ref.invalidate(backendSyncProvider);
-            },
-            elevated: true,
-          ),
-          if (widget.canUseTeamHub) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              l10n.comments,
-              style: AppTypography.headingSmall.copyWith(
-                color: AppColors.darkText,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            if (comments.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBackground,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: AppColors.line),
-                ),
-                child: Text(
-                  l10n.noCommentsYet,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.mutedText,
-                  ),
-                ),
-              )
-            else
-              for (final comment in comments) ...[
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              children: [
                 _ThreadMessageCard(
-                  message: comment,
+                  message: currentMessage,
                   accent: widget.accent,
-                  authorLabel: comment.senderMemberId == null
-                      ? comment.senderName
-                      : comment.senderName,
+                  title: _messageTitle(currentMessage, l10n),
+                  authorLabel:
+                      widget.isSent ? l10n.you : currentMessage.senderName,
                   onReact: (emoji) async {
                     await ref
                         .read(messagesProvider.notifier)
-                        .toggleReaction(comment.id, emoji);
+                        .toggleReaction(currentMessage.id, emoji);
                     ref.invalidate(backendSyncProvider);
                   },
+                  elevated: true,
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                if (widget.canUseTeamHub) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    l10n.comments,
+                    style: AppTypography.headingSmall.copyWith(
+                      color: AppColors.darkText,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  if (comments.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: Text(
+                        l10n.noCommentsYet,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                    )
+                  else
+                    for (final comment in comments) ...[
+                      _ThreadMessageCard(
+                        message: comment,
+                        accent: widget.accent,
+                        authorLabel: comment.senderMemberId == null
+                            ? comment.senderName
+                            : comment.senderName,
+                        onReact: (emoji) async {
+                          await ref
+                              .read(messagesProvider.notifier)
+                              .toggleReaction(comment.id, emoji);
+                          ref.invalidate(backendSyncProvider);
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                ],
               ],
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          if (widget.canReply)
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final result =
-                          await Navigator.of(context).push<_ComposeResult>(
-                        MaterialPageRoute(
-                          builder: (context) => _ComposeMessagePage(
-                            accent: widget.accent,
-                            canUseTeamHub: widget.canUseTeamHub,
-                            contacts: const [],
-                            hubOnly: widget.canUseTeamHub,
-                            initialSubject:
-                                'Re: ${_rootSubject(currentMessage)}',
-                            parentMessageId:
-                                widget.canUseTeamHub ? currentMessage.id : null,
+            ),
+          ),
+          if (widget.canUseTeamHub && widget.canReply)
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppColors.cardBackground,
+                  border: Border(top: BorderSide(color: AppColors.line)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        minLines: 1,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          hintText: l10n.addHubComment,
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
                           ),
                         ),
-                      );
-                      if (context.mounted) Navigator.of(context).pop(result);
-                    },
-                    icon: const Icon(Icons.reply_rounded),
-                    label:
-                        Text(widget.canUseTeamHub ? l10n.comment : l10n.reply),
-                  ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    IconButton.filled(
+                      onPressed: _sendingComment
+                          ? null
+                          : () => _sendComment(currentMessage),
+                      icon: _sendingComment
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: widget.accent,
+                        foregroundColor: AppColors.cardBackground,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
         ],
       ),
@@ -1897,19 +1963,13 @@ class _ComposeMessagePage extends StatefulWidget {
     required this.accent,
     required this.canUseTeamHub,
     required this.contacts,
-    this.hubOnly = false,
     this.defaultToTeamHub = false,
-    this.initialSubject = '',
-    this.parentMessageId,
   });
 
   final Color accent;
   final bool canUseTeamHub;
   final List<StaffContact> contacts;
-  final bool hubOnly;
   final bool defaultToTeamHub;
-  final String initialSubject;
-  final String? parentMessageId;
 
   @override
   State<_ComposeMessagePage> createState() => _ComposeMessagePageState();
@@ -1924,11 +1984,11 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
   @override
   void initState() {
     super.initState();
-    _subjectController = TextEditingController(text: widget.initialSubject);
-    _audience = widget.hubOnly || widget.defaultToTeamHub
+    _subjectController = TextEditingController();
+    _audience = widget.defaultToTeamHub
         ? _ComposeAudience.teamHub
         : _ComposeAudience.contacts;
-    if (!widget.hubOnly && widget.contacts.length == 1) {
+    if (widget.contacts.length == 1) {
       _selectedContactIds.add(widget.contacts.first.id);
     }
   }
@@ -1953,7 +2013,6 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
         content: content,
         audience: _audience,
         recipientMemberIds: _selectedContactIds.toList(),
-        parentMessageId: widget.parentMessageId,
       ),
     );
   }
@@ -2027,11 +2086,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
       appBar: AppBar(
         backgroundColor: widget.accent,
         foregroundColor: AppColors.cardBackground,
-        title: Text(widget.hubOnly
-            ? l10n.postHubComment
-            : widget.canUseTeamHub
-                ? l10n.writeMessage
-                : l10n.writeMessage),
+        title: Text(l10n.writeMessage),
         actions: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -2042,79 +2097,75 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          Text(widget.hubOnly ? l10n.hub : l10n.subject,
-              style: AppTypography.headingSmall),
+          Text(l10n.subject, style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _subjectController,
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
-              hintText: widget.hubOnly
-                  ? l10n.whatShouldTeamTrack
-                  : l10n.whatIsThisAbout,
+              hintText: l10n.whatIsThisAbout,
               filled: true,
               fillColor: AppColors.cardBackground,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          if (!widget.hubOnly) ...[
-            Text('Send to', style: AppTypography.headingSmall),
-            const SizedBox(height: AppSpacing.sm),
-            if (widget.canUseTeamHub)
-              _AudienceOption(
-                title: 'Team Hub post',
-                subtitle: l10n.postEveryoneCanSee,
-                value: _ComposeAudience.teamHub,
-                groupValue: _audience,
-                accent: widget.accent,
-                onChanged: (value) => setState(() {
-                  _audience = value;
-                  _selectedContactIds.clear();
-                }),
-              ),
+          Text('Send to', style: AppTypography.headingSmall),
+          const SizedBox(height: AppSpacing.sm),
+          if (widget.canUseTeamHub)
             _AudienceOption(
-              title: 'Private message',
-              subtitle: 'Choose exactly who should receive it.',
-              value: _ComposeAudience.contacts,
+              title: 'Team Hub post',
+              subtitle: l10n.postEveryoneCanSee,
+              value: _ComposeAudience.teamHub,
               groupValue: _audience,
               accent: widget.accent,
-              onChanged: (value) => setState(() => _audience = value),
+              onChanged: (value) => setState(() {
+                _audience = value;
+                _selectedContactIds.clear();
+              }),
             ),
-            if (_audience == _ComposeAudience.contacts) ...[
-              const SizedBox(height: AppSpacing.sm),
-              if (widget.contacts.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.line),
+          _AudienceOption(
+            title: 'Private message',
+            subtitle: 'Choose exactly who should receive it.',
+            value: _ComposeAudience.contacts,
+            groupValue: _audience,
+            accent: widget.accent,
+            onChanged: (value) => setState(() => _audience = value),
+          ),
+          if (_audience == _ComposeAudience.contacts) ...[
+            const SizedBox(height: AppSpacing.sm),
+            if (widget.contacts.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: Text(
+                  AppLocalizations.of(context).noManagerContactsYet,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.mutedText,
                   ),
-                  child: Text(
-                    AppLocalizations.of(context).noManagerContactsYet,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.mutedText,
-                    ),
-                  ),
-                )
-              else
-                for (final contact in widget.contacts)
-                  _RecipientOption(
-                    contact: contact,
-                    accent: widget.accent,
-                    selected: _selectedContactIds.contains(contact.id),
-                    onChanged: (selected) => setState(() {
-                      _audience = _ComposeAudience.contacts;
-                      if (selected) {
-                        _selectedContactIds.add(contact.id);
-                      } else {
-                        _selectedContactIds.remove(contact.id);
-                      }
-                    }),
-                  ),
-            ],
-            const SizedBox(height: AppSpacing.lg),
-          ] else ...[
+                ),
+              )
+            else
+              for (final contact in widget.contacts)
+                _RecipientOption(
+                  contact: contact,
+                  accent: widget.accent,
+                  selected: _selectedContactIds.contains(contact.id),
+                  onChanged: (selected) => setState(() {
+                    _audience = _ComposeAudience.contacts;
+                    if (selected) {
+                      _selectedContactIds.add(contact.id);
+                    } else {
+                      _selectedContactIds.remove(contact.id);
+                    }
+                  }),
+                ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          if (_audience == _ComposeAudience.teamHub) ...[
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
@@ -2123,7 +2174,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                 border: Border.all(color: AppColors.line),
               ),
               child: Text(
-                l10n.hubCommentInfo,
+                l10n.postEveryoneCanSee,
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.mutedText,
                 ),
@@ -2131,8 +2182,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
             ),
             const SizedBox(height: AppSpacing.lg),
           ],
-          Text(widget.hubOnly ? l10n.comment : l10n.message,
-              style: AppTypography.headingSmall),
+          Text(l10n.message, style: AppTypography.headingSmall),
           const SizedBox(height: AppSpacing.sm),
           Container(
             decoration: BoxDecoration(
@@ -2152,9 +2202,7 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
                   maxLines: 12,
                   maxLength: 2000,
                   decoration: InputDecoration(
-                    hintText: widget.hubOnly
-                        ? l10n.addHubComment
-                        : l10n.writeYourMessage,
+                    hintText: l10n.writeYourMessage,
                     filled: true,
                     fillColor: AppColors.cardBackground,
                     border: InputBorder.none,
@@ -2169,11 +2217,10 @@ class _ComposeMessagePageState extends State<_ComposeMessagePage> {
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
             onPressed: _submit,
-            icon: Icon(
-                widget.hubOnly ? Icons.forum_outlined : Icons.send_rounded),
-            label: Text(widget.hubOnly
-                ? l10n.postComment
-                : _audience == _ComposeAudience.teamHub
+            icon: Icon(_audience == _ComposeAudience.teamHub
+                ? Icons.forum_outlined
+                : Icons.send_rounded),
+            label: Text(_audience == _ComposeAudience.teamHub
                     ? l10n.postToHub
                     : _selectedContactIds.length == 1
                         ? l10n.sendPrivateText
@@ -2482,14 +2529,12 @@ class _ComposeResult {
     required this.content,
     required this.audience,
     this.recipientMemberIds = const [],
-    this.parentMessageId,
   });
 
   final String subject;
   final String content;
   final _ComposeAudience audience;
   final List<String> recipientMemberIds;
-  final String? parentMessageId;
 }
 
 class _NoMessagesView extends StatelessWidget {
