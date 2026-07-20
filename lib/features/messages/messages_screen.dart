@@ -20,7 +20,7 @@ import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
 import '../../l10n/generated/app_localizations.dart';
 
-enum _MessageFilter { inbox, unread, sent, contacts }
+enum _MessageFilter { all, unread, sent }
 
 enum _HubSection { direct, feed, contacts }
 
@@ -211,6 +211,7 @@ class MessagesScreen extends ConsumerStatefulWidget {
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   _HubSection _hubSection = _HubSection.direct;
+  _MessageFilter _messageFilter = _MessageFilter.all;
   bool _isSending = false;
 
   Color _accentForPlan(String plan) {
@@ -388,6 +389,42 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     }
   }
 
+  List<AppMessage> _filterMessages(
+    List<AppMessage> messages,
+    String? membershipId,
+  ) {
+    return switch (_messageFilter) {
+      _MessageFilter.all => messages,
+      _MessageFilter.unread => messages
+          .where((message) =>
+              message.senderMemberId != membershipId && !message.isRead)
+          .toList(),
+      _MessageFilter.sent => messages
+          .where((message) => message.senderMemberId == membershipId)
+          .toList(),
+    };
+  }
+
+  List<_HubTopic> _filterHubTopics(
+    List<_HubTopic> topics,
+    String? membershipId,
+  ) {
+    return switch (_messageFilter) {
+      _MessageFilter.all => topics,
+      _MessageFilter.unread =>
+        topics.where((topic) => topic.unreadCount > 0).toList(),
+      _MessageFilter.sent => topics
+          .where(
+            (topic) =>
+                topic.root.senderMemberId == membershipId ||
+                topic.comments.any(
+                  (comment) => comment.senderMemberId == membershipId,
+                ),
+          )
+          .toList(),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -404,14 +441,16 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         .where((message) =>
             message.senderMemberId != membershipId && !message.isRead)
         .length;
-    final directMessages = messages.where(_isDirectMessage).toList();
+    final directMessagesAll = messages.where(_isDirectMessage).toList();
     final hubMessages = messages
         .where((message) =>
             message.messageScope == 'post' ||
             message.messageScope == 'comment' ||
             message.parentMessageId != null)
         .toList();
-    final hubTopics = _buildHubTopics(hubMessages, membershipId);
+    final hubTopicsAll = _buildHubTopics(hubMessages, membershipId);
+    final directMessages = _filterMessages(directMessagesAll, membershipId);
+    final hubTopics = _filterHubTopics(hubTopicsAll, membershipId);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -424,8 +463,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             canCompose: canCompose,
             isHub: _hubSection == _HubSection.feed && canPublishPosts,
             unreadCount: unreadCount,
+            selectedFilter: _messageFilter,
             onCompose: () => _openComposer(plan),
             onMarkAllRead: () => _markAllRead(messages, membershipId),
+            onFilterChanged: (filter) => setState(() {
+              _messageFilter = filter;
+            }),
           ),
           Container(
             color: AppColors.cardBackground,
@@ -461,8 +504,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   : _hubSection == _HubSection.direct
                       ? (directMessages.isEmpty
                           ? _NoMessagesView(
-                              filter: _MessageFilter.inbox,
-                              onAction: () => _openComposer(plan),
+                              filter: _messageFilter,
+                              onAction: directMessagesAll.isEmpty &&
+                                      _messageFilter == _MessageFilter.all
+                                  ? () => _openComposer(plan)
+                                  : null,
                             )
                           : ListView.separated(
                               padding: EdgeInsets.zero,
@@ -487,13 +533,19 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                               },
                             ))
                       : hubTopics.isEmpty
-                          ? _EmptyHubView(
-                              isEnterprise: canUsePosts,
-                              canCreatePost: canPublishPosts,
-                              onAction: canPublishPosts
-                                  ? () => _openComposer(plan)
-                                  : null,
-                            )
+                          ? hubTopicsAll.isEmpty &&
+                                  _messageFilter == _MessageFilter.all
+                              ? _EmptyHubView(
+                                  isEnterprise: canUsePosts,
+                                  canCreatePost: canPublishPosts,
+                                  onAction: canPublishPosts
+                                      ? () => _openComposer(plan)
+                                      : null,
+                                )
+                              : _NoMessagesView(
+                                  filter: _messageFilter,
+                                  onAction: null,
+                                )
                           : ListView.separated(
                               padding: EdgeInsets.zero,
                               itemCount: hubTopics.length,
@@ -528,8 +580,10 @@ class _MessagesHeader extends StatelessWidget {
     required this.canCompose,
     required this.isHub,
     required this.unreadCount,
+    required this.selectedFilter,
     required this.onCompose,
     required this.onMarkAllRead,
+    required this.onFilterChanged,
   });
 
   final Color accent;
@@ -538,8 +592,10 @@ class _MessagesHeader extends StatelessWidget {
   final bool canCompose;
   final bool isHub;
   final int unreadCount;
+  final _MessageFilter selectedFilter;
   final VoidCallback onCompose;
   final VoidCallback onMarkAllRead;
+  final ValueChanged<_MessageFilter> onFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -621,54 +677,35 @@ class _MessagesHeader extends StatelessWidget {
             onSelected: (action) {
               if (action == _MessageMenuAction.markAllRead && unreadCount > 0) {
                 onMarkAllRead();
+                return;
               }
+              final nextFilter = switch (action) {
+                _MessageMenuAction.all => _MessageFilter.all,
+                _MessageMenuAction.unread => _MessageFilter.unread,
+                _MessageMenuAction.sent => _MessageFilter.sent,
+                _MessageMenuAction.markAllRead => null,
+              };
+              if (nextFilter != null) onFilterChanged(nextFilter);
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 enabled: false,
                 child: _MessageMenuHeader(),
               ),
-              const PopupMenuItem(
+              CheckedPopupMenuItem(
                 value: _MessageMenuAction.all,
-                child: Text('All'),
+                checked: selectedFilter == _MessageFilter.all,
+                child: const Text('All'),
               ),
-              const PopupMenuItem(
+              CheckedPopupMenuItem(
                 value: _MessageMenuAction.unread,
-                child: Text('Unread'),
+                checked: selectedFilter == _MessageFilter.unread,
+                child: const Text('Unread'),
               ),
-              const PopupMenuItem(
-                value: _MessageMenuAction.public,
-                child: Text('Public'),
-              ),
-              const PopupMenuItem(
-                value: _MessageMenuAction.groups,
-                child: Text('Groups'),
-              ),
-              const PopupMenuItem(
-                value: _MessageMenuAction.day,
-                child: Text('Day'),
-              ),
-              const PopupMenuItem(
-                value: _MessageMenuAction.archived,
-                child: ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('Archived'),
-                  trailing: Icon(Icons.inventory_2_outlined),
-                ),
-              ),
-              const PopupMenuItem(
-                value: _MessageMenuAction.searchPerson,
-                child: Text('Search person'),
-              ),
-              const PopupMenuItem(
-                value: _MessageMenuAction.manage,
-                child: ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('Manage messages'),
-                  trailing: Icon(Icons.settings_outlined),
-                ),
+              CheckedPopupMenuItem(
+                value: _MessageMenuAction.sent,
+                checked: selectedFilter == _MessageFilter.sent,
+                child: const Text('Sent'),
               ),
               PopupMenuItem(
                 enabled: unreadCount > 0,
@@ -691,12 +728,7 @@ class _MessagesHeader extends StatelessWidget {
 enum _MessageMenuAction {
   all,
   unread,
-  public,
-  groups,
-  day,
-  archived,
-  searchPerson,
-  manage,
+  sent,
   markAllRead,
 }
 
@@ -3221,10 +3253,9 @@ class _NoMessagesView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final label = switch (filter) {
-      _MessageFilter.inbox => l10n.noMessagesYet,
+      _MessageFilter.all => l10n.noMessagesYet,
       _MessageFilter.unread => l10n.noUnreadMessages,
       _MessageFilter.sent => l10n.noSentMessages,
-      _MessageFilter.contacts => l10n.noManagerContactsYet,
     };
 
     return ListView(
@@ -3242,7 +3273,7 @@ class _NoMessagesView extends StatelessWidget {
               Text(label, style: AppTypography.headingMedium),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                filter == _MessageFilter.inbox
+                filter == _MessageFilter.all
                     ? 'Start a private message or pull down to refresh.'
                     : 'Pull down to refresh this list.',
                 textAlign: TextAlign.center,

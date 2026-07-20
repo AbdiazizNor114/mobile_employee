@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shaqonet_employee/core/models/message.dart';
+import 'package:shaqonet_employee/core/providers/backend_sync_provider.dart';
+import 'package:shaqonet_employee/core/providers/message_provider.dart';
 import 'package:shaqonet_employee/core/models/shift.dart';
 import 'package:shaqonet_employee/core/providers/mock_work_provider.dart';
 import 'package:shaqonet_employee/core/providers/service_providers.dart';
@@ -77,6 +80,92 @@ void main() {
     await tester.tap(find.byIcon(Icons.person_outline_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Profile'), findsWidgets);
+  });
+
+  testWidgets('filters messages by all unread and sent', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appBootstrapProvider.overrideWith((ref) async {}),
+          currentSessionProvider.overrideWith((ref) => true),
+          backendSyncProvider.overrideWith((ref) async {}),
+        ],
+        child: const ShaqoNetEmployeeBootstrap(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ShaqoNetEmployeeBootstrap)),
+    );
+    await container.read(storageServiceProvider).saveMembershipId('member-me');
+    container.read(messagesProvider.notifier).replaceAll([
+      AppMessage(
+        id: 'read-message',
+        senderName: 'Manager',
+        subject: 'Read direct note',
+        content: 'Already opened',
+        sentAt: DateTime(2026, 7, 20, 9),
+        senderMemberId: 'manager-1',
+        recipientMemberId: 'member-me',
+        isRead: true,
+      ),
+      AppMessage(
+        id: 'unread-message',
+        senderName: 'Manager',
+        subject: 'Unread direct note',
+        content: 'Needs attention',
+        sentAt: DateTime(2026, 7, 20, 10),
+        senderMemberId: 'manager-1',
+        recipientMemberId: 'member-me',
+        isRead: false,
+      ),
+      AppMessage(
+        id: 'sent-message',
+        senderName: 'Me',
+        subject: 'Sent direct note',
+        content: 'Sent by me',
+        sentAt: DateTime(2026, 7, 20, 11),
+        senderMemberId: 'member-me',
+        recipientMemberId: 'manager-1',
+        isRead: true,
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Messages'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Read direct note'), findsOneWidget);
+    expect(find.text('Unread direct note'), findsOneWidget);
+    expect(find.text('Sent direct note'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unread').last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Read direct note'), findsNothing);
+    expect(find.text('Unread direct note'), findsOneWidget);
+    expect(find.text('Sent direct note'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sent').last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Read direct note'), findsNothing);
+    expect(find.text('Unread direct note'), findsNothing);
+    expect(find.text('Sent direct note'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All').last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Read direct note'), findsOneWidget);
+    expect(find.text('Unread direct note'), findsOneWidget);
+    expect(find.text('Sent direct note'), findsOneWidget);
   });
 
   testWidgets('opens the schedule in Somali without locale errors', (
