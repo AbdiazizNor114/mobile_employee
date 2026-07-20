@@ -2130,9 +2130,24 @@ class _ThreadMessageCard extends StatelessWidget {
   final bool elevated;
   final ValueChanged<String> onReact;
 
+  Future<void> _chooseReaction(BuildContext context) async {
+    final emoji = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ReactionPickerSheet(
+        accent: accent,
+        existingEmojis: _visibleReactionEmojis(message),
+      ),
+    );
+    if (emoji != null && emoji.trim().isNotEmpty) {
+      onReact(emoji.trim());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final photo = profilePhotoProvider(message.senderProfilePhotoUrl);
+    final visibleEmojis = _visibleReactionEmojis(message);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -2212,39 +2227,219 @@ class _ThreadMessageCard extends StatelessWidget {
             accent: accent,
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: [
-              for (final emoji in const ['👍', '❤️', '✅', '🙏'])
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.xs),
-                  child: InkWell(
-                    onTap: () => onReact(emoji),
-                    borderRadius: BorderRadius.circular(999),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
+              for (final emoji in visibleEmojis)
+                InkWell(
+                  onTap: () => onReact(emoji),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: message.myReaction == emoji
+                          ? accent.withValues(alpha: 0.14)
+                          : AppColors.background,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
                         color: message.myReaction == emoji
-                            ? accent.withValues(alpha: 0.14)
-                            : AppColors.background,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: message.myReaction == emoji
-                              ? accent
-                              : AppColors.line,
-                        ),
+                            ? accent
+                            : AppColors.line,
                       ),
-                      child: Text(
-                        '$emoji${(message.reactionCounts[emoji] ?? 0) > 0 ? ' ${message.reactionCounts[emoji]}' : ''}',
-                      ),
+                    ),
+                    child: Text(
+                      '$emoji${(message.reactionCounts[emoji] ?? 0) > 0 ? ' ${message.reactionCounts[emoji]}' : ''}',
                     ),
                   ),
                 ),
+              InkWell(
+                onTap: () => _chooseReaction(context),
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_reaction_outlined,
+                        size: 16,
+                        color: accent,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'React',
+                        style: AppTypography.caption.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+List<String> _visibleReactionEmojis(AppMessage message) {
+  final emojis = <String>[
+    ...message.reactionCounts.entries
+        .where((entry) => entry.value > 0 && entry.key.trim().isNotEmpty)
+        .map((entry) => entry.key.trim()),
+    if (message.myReaction?.trim().isNotEmpty == true)
+      message.myReaction!.trim(),
+  ];
+  return emojis.toSet().toList()
+    ..sort((a, b) {
+      final aCount = message.reactionCounts[a] ?? 0;
+      final bCount = message.reactionCounts[b] ?? 0;
+      if (a == message.myReaction) return -1;
+      if (b == message.myReaction) return 1;
+      return bCount.compareTo(aCount);
+    });
+}
+
+class _ReactionPickerSheet extends StatefulWidget {
+  const _ReactionPickerSheet({
+    required this.accent,
+    required this.existingEmojis,
+  });
+
+  final Color accent;
+  final List<String> existingEmojis;
+
+  @override
+  State<_ReactionPickerSheet> createState() => _ReactionPickerSheetState();
+}
+
+class _ReactionPickerSheetState extends State<_ReactionPickerSheet> {
+  static const _suggestedEmojis = [
+    '👍',
+    '❤️',
+    '✅',
+    '🙏',
+    '👏',
+    '🙌',
+    '🔥',
+    '💯',
+    '😊',
+    '😂',
+    '😮',
+    '😢',
+    '🤝',
+    '👀',
+    '⭐',
+    '🚕',
+  ];
+
+  final _customController = TextEditingController();
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final choices = [
+      ...widget.existingEmojis,
+      ..._suggestedEmojis,
+    ].where((emoji) => emoji.trim().isNotEmpty).toSet().toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Choose reaction',
+                  style: AppTypography.headingSmall.copyWith(
+                    color: AppColors.darkText,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                for (final emoji in choices)
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(emoji),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: 48,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _customController,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Or type any emoji',
+                filled: true,
+                fillColor: AppColors.background,
+                suffixIcon: IconButton(
+                  onPressed: () {
+                    final emoji = _customController.text.trim();
+                    if (emoji.isNotEmpty) Navigator.of(context).pop(emoji);
+                  },
+                  icon: Icon(Icons.check_rounded, color: widget.accent),
+                ),
+              ),
+              onSubmitted: (value) {
+                final emoji = value.trim();
+                if (emoji.isNotEmpty) Navigator.of(context).pop(emoji);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
