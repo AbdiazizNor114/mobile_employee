@@ -262,6 +262,8 @@ void main() {
     await tester.tap(find.text('Awaiting confirmation'));
     await tester.pumpAndSettle();
 
+    expect(find.textContaining('Confirm within'), findsWidgets);
+    expect(find.textContaining('Confirm by'), findsNothing);
     expect(find.text('Confirm worked'), findsOneWidget);
   });
 

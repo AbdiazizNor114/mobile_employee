@@ -427,9 +427,7 @@ class _ShiftHistoryRow extends StatelessWidget {
       _ConfirmationVisualState.neutral => l10n.scheduled,
     };
     final detail = switch (state) {
-      _ConfirmationVisualState.pending => l10n.confirmBy(
-          _localizedShiftDate(shift.workConfirmationDeadline, locale),
-        ),
+      _ConfirmationVisualState.pending => _pendingConfirmationText(shift, now),
       _ConfirmationVisualState.overdue => l10n.managerReviewRequired,
       _ => '',
     };
@@ -621,7 +619,7 @@ class _ShiftHistoryDetailSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                _statusDetail(l10n, shift, state, locale),
+                _statusDetail(l10n, shift, state, locale, now),
                 style: AppTypography.bodyMedium.copyWith(
                   color: color,
                   fontWeight: FontWeight.w800,
@@ -750,11 +748,10 @@ String _statusDetail(
   Shift shift,
   _ConfirmationVisualState state,
   String locale,
+  DateTime now,
 ) {
   return switch (state) {
-    _ConfirmationVisualState.pending => l10n.confirmBy(
-        _localizedShiftDate(shift.workConfirmationDeadline, locale),
-      ),
+    _ConfirmationVisualState.pending => _pendingConfirmationText(shift, now),
     _ConfirmationVisualState.confirmed => shift.workConfirmedAt == null
         ? l10n.confirmed
         : l10n.confirmedOn(
@@ -764,6 +761,13 @@ String _statusDetail(
     _ConfirmationVisualState.absent => l10n.absent,
     _ConfirmationVisualState.neutral => l10n.scheduled,
   };
+}
+
+String _pendingConfirmationText(Shift shift, DateTime now) {
+  final days = _daysUntil(shift.workConfirmationDeadline, now);
+  if (days == 0) return 'Confirm today';
+  if (days == 1) return 'Confirm within 1 day';
+  return 'Confirm within $days days';
 }
 
 int _historyPriority(
