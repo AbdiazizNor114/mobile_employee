@@ -112,8 +112,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const Spacer(),
                     Center(
                       child: SvgPicture.asset(
-                        'assets/logos/shaqonet-stacked-dark.svg',
-                        width: 190,
+                        'assets/logos/shaqonet-logo-transparent-dark.svg',
+                        width: 230,
                         semanticsLabel: l10n.appTitle,
                       ),
                     ),

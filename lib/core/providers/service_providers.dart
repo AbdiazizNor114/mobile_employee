@@ -135,7 +135,8 @@ final currentSessionProvider = Provider<bool>((ref) {
   // By watching isSignedInProvider (a StreamProvider), we ensure this provider
   // re-evaluates whenever the authentication state changes.
   final authState = ref.watch(isSignedInProvider);
-  return authState.value ?? ref.watch(authServiceProvider).hasActiveSession;
+  final hasStoredSession = ref.watch(authServiceProvider).hasActiveSession;
+  return hasStoredSession || (authState.value ?? false);
 });
 
 final signOutProvider = Provider<Future<void> Function()>((ref) {
