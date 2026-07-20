@@ -9,7 +9,6 @@ import '../../core/providers/mock_work_provider.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
-import '../../core/widgets/offline_cache_banner.dart';
 import '../../core/widgets/stat_card.dart';
 import '../../l10n/generated/app_localizations.dart';
 
@@ -114,8 +113,6 @@ class _HoursScreenState extends ConsumerState<HoursScreen> {
               widget.showHeader ? null : const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
-            const OfflineCacheBanner(),
-            const SizedBox(height: AppSpacing.md),
             DashboardCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

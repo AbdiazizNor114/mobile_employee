@@ -9,7 +9,6 @@ import '../../core/providers/backend_sync_provider.dart';
 import '../../core/providers/mock_work_provider.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
-import '../../core/widgets/offline_cache_banner.dart';
 import '../../core/widgets/segmented_tabs.dart';
 import '../../l10n/generated/app_localizations.dart';
 
@@ -78,8 +77,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                         onChanged: (index) =>
                             setState(() => _selectedTab = index),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      const OfflineCacheBanner(),
                       const SizedBox(height: AppSpacing.md),
                       DashboardCard(
                         child: _WeekStrip(

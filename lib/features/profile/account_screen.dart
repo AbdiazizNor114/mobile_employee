@@ -9,7 +9,6 @@ import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
-import '../../core/widgets/offline_cache_banner.dart';
 import '../../l10n/generated/app_localizations.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -44,8 +43,6 @@ class AccountScreen extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   children: [
-                    const OfflineCacheBanner(),
-                    const SizedBox(height: AppSpacing.md),
                     DashboardCard(
                       child: Column(
                         children: [

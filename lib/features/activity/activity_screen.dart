@@ -11,7 +11,6 @@ import '../../core/providers/backend_sync_provider.dart';
 import '../../core/widgets/activity_list_item.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
-import '../../core/widgets/offline_cache_banner.dart';
 import '../../l10n/generated/app_localizations.dart';
 
 class ActivityScreen extends ConsumerStatefulWidget {
@@ -63,8 +62,6 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
-                      const OfflineCacheBanner(),
-                      const SizedBox(height: AppSpacing.md),
                       DashboardCard(
                         child: Row(
                           children: [

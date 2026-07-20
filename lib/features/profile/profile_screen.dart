@@ -13,7 +13,6 @@ import '../../core/providers/service_providers.dart';
 import '../../core/utils/profile_photo.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/dashboard_card.dart';
-import '../../core/widgets/offline_cache_banner.dart';
 import '../../core/widgets/segmented_tabs.dart';
 import '../../core/widgets/shift_list_item.dart';
 import '../hours/hours_screen.dart';
@@ -65,8 +64,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       onChanged: (index) =>
                           setState(() => _selectedTab = index),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    const OfflineCacheBanner(),
                     const SizedBox(height: AppSpacing.md),
                     _tabBody(),
                   ],
