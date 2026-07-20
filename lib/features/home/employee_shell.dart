@@ -32,6 +32,7 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
   SupabaseRealtimeSyncService? _realtimeSyncService;
   bool _syncInFlight = false;
   bool _manualSyncInFlight = false;
+  String? _dismissedSyncError;
 
   @override
   void initState() {
@@ -82,7 +83,10 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
 
   Future<void> _retrySync() async {
     if (_manualSyncInFlight) return;
-    setState(() => _manualSyncInFlight = true);
+    setState(() {
+      _manualSyncInFlight = true;
+      _dismissedSyncError = null;
+    });
     try {
       await _syncNow(force: true);
     } finally {
@@ -112,12 +116,14 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
       MessagesScreen(),
       AccountScreen(),
     ];
+    final showSyncNotice =
+        syncError != null && hasData && syncError != _dismissedSyncError;
 
     return Scaffold(
       body: Stack(
         children: [
           IndexedStack(index: _currentIndex, children: screens),
-          if (syncError != null && hasData)
+          if (showSyncNotice)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 8,
               left: 12,
@@ -147,6 +153,14 @@ class _EmployeeShellState extends ConsumerState<EmployeeShell> {
                         child: Text(
                           _manualSyncInFlight ? 'Retrying...' : 'Retry',
                         ),
+                      ),
+                      IconButton(
+                        tooltip: 'Dismiss',
+                        onPressed: () => setState(
+                          () => _dismissedSyncError = syncError,
+                        ),
+                        icon: const Icon(Icons.close_rounded),
+                        color: AppColors.mutedText,
                       ),
                     ],
                   ),

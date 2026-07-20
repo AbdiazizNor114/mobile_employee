@@ -3156,9 +3156,10 @@ List<_HubTopic> _buildHubTopics(
   String? membershipId,
 ) {
   final byId = {for (final message in messages) message.id: message};
+  final rootIdBySubject = _canonicalRootIdsBySubject(messages);
   final grouped = <String, List<AppMessage>>{};
   for (final message in messages) {
-    final key = _topicKey(message, byId);
+    final key = _topicKey(message, byId, rootIdBySubject);
     grouped.putIfAbsent(key, () => []).add(message);
   }
 
@@ -3170,7 +3171,10 @@ List<_HubTopic> _buildHubTopics(
           message.parentMessageId == null && !_isReplySubject(message.subject),
       orElse: () => thread.first,
     );
-    final comments = thread.where((message) => message.id != root.id).toList();
+    final comments = thread
+        .where((message) => message.id != root.id)
+        .where((message) => !_isDuplicateRootCopy(message, root))
+        .toList();
     return _HubTopic(
       key: entry.key,
       title: _rootSubject(root),
@@ -3187,23 +3191,63 @@ List<_HubTopic> _buildHubTopics(
   return topics;
 }
 
-String _topicKey(AppMessage message, Map<String, AppMessage> byId) {
+Map<String, String> _canonicalRootIdsBySubject(List<AppMessage> messages) {
+  final roots = messages
+      .where((message) =>
+          message.parentMessageId == null && !_isReplySubject(message.subject))
+      .toList()
+    ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+  final rootIdBySubject = <String, String>{};
+  for (final root in roots) {
+    final subject = _normalizedRootSubject(root);
+    if (subject.isNotEmpty) {
+      rootIdBySubject.putIfAbsent(subject, () => root.id);
+    }
+  }
+  return rootIdBySubject;
+}
+
+String _topicKey(
+  AppMessage message,
+  Map<String, AppMessage> byId,
+  Map<String, String> rootIdBySubject,
+) {
   final parentId = message.parentMessageId;
   if (parentId != null && parentId.trim().isNotEmpty) {
     final root = byId[parentId];
-    if (root != null) return root.id;
-    final subject = _rootSubject(message).toLowerCase().trim();
-    if (subject.isNotEmpty) return subject;
+    if (root != null) {
+      return rootIdBySubject[_normalizedRootSubject(root)] ?? root.id;
+    }
+    final subject = _normalizedRootSubject(message);
+    if (subject.isNotEmpty) return rootIdBySubject[subject] ?? subject;
     return parentId;
   }
-  final subject = _rootSubject(message).toLowerCase().trim();
-  if (subject.isNotEmpty) return subject;
+  final subject = _normalizedRootSubject(message);
+  if (subject.isNotEmpty) {
+    return rootIdBySubject[subject] ?? subject;
+  }
   final firstLine = message.content
       .split('\n')
       .map((line) => line.trim())
       .where((line) => line.isNotEmpty)
       .firstOrNull;
   return '${message.id}:${firstLine ?? message.content}'.toLowerCase();
+}
+
+bool _isDuplicateRootCopy(AppMessage message, AppMessage root) {
+  if (message.parentMessageId != null || _isReplySubject(message.subject)) {
+    return false;
+  }
+  return _normalizedRootSubject(message) == _normalizedRootSubject(root) &&
+      _messagePreview(message.content).trim().toLowerCase() ==
+          _messagePreview(root.content).trim().toLowerCase();
+}
+
+String _normalizedRootSubject(AppMessage message) {
+  return _rootSubject(message)
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
 String _rootSubject(AppMessage message) {
